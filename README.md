@@ -13,7 +13,7 @@ Usage
 **Current Checks Impliemented:**
 
 - Print current exim queue.
-- Check for custom /etc/mailips and /etc/mailhelo.
+- Check for custom /etc/mailips, /etc/mailhelo, and /etc/reversedns.
 - Check if port 26 is enabled.
 - Check if mail IPs are blacklisted
 - Show reverse DNS for mail IPs
