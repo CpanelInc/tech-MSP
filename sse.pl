@@ -31,6 +31,8 @@ hostname_check();
 domain_exist();
 check_local_or_remote();
 domain_resolv();
+check_spf();
+check_dkim();
 }
 
 elsif ($help) { ##--help
@@ -234,6 +236,32 @@ foreach my $line (keys %list) {
     else {
     print "$ip is listed on $line\n";
 }
+}
+}
+
+
+sub check_spf {
+my @check = qx/dig $domain TXT/;
+print "$domain has the folloiwng SPF records:\n";
+foreach my $check (@check) {
+if ( $check =~ m/.*spf.*/) {
+print "$check";
+}
+}
+}
+
+sub check_dkim {
+my @check = qx/dig default._domainkey.$domain TXT/;
+if (@check) {
+foreach my $check (@check) {
+if ( $check =~ m/.*DKIM.*/ ) {
+print "$domain has the following domain keys:\n ";
+print $check;
+}
+}
+}
+else {
+return;
 }
 }
 }
