@@ -17,6 +17,7 @@ Usage
 - Check if port 26 is enabled.
 - Check if mail IPs are blacklisted
 - Show reverse DNS for mail IPs
+- Check for SPF and DKIM records
 
 **[With --domain option]**
 
