@@ -12,9 +12,10 @@ $ENV{'PATH'} = '/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin';
 ## OPTIONS ##
 
 my %opts;
-my $domain = 1;
+my $domain;
+my $help;
 
-GetOptions(\%opts, 'domain:s'=> \$domain) or die ("Please see --help\n");
+GetOptions(\%opts, 'domain=s'=> \$domain, 'help'=>\$help) or die ("Please see --help\n");
 
 ## GLOBALS ##
 
@@ -25,18 +26,18 @@ get_local_ipaddrs();
 
 ## GUTS ##
 
-if (! $domain) { ## -- kill the script if no arguement or bad option is passed.
-    die("Invalid usage. Please see --help\n");
-}
-
-elsif ($domain ne 1){ ## --domain{
+if ($domain){ ## --domain{
 hostname_check();
 domain_exist();
-check_local_or_remote(); 
+check_local_or_remote();
 domain_resolv();
 }
 
-else { ## No options passed.    
+elsif ($help) { ##--help
+help();
+}
+
+else { ## No options passed.
 print "There are currently $queue_cnt messages in the Exim queue.\n";
 port_26();
 custom_etc_mail();
@@ -45,6 +46,10 @@ rdns_lookup();
 }
 
 ##INFORMATIONAL CHEX##
+
+sub help {
+print "Usage: ./sse.pl [OPTION] [VALUE]\n","Without options:  Run informational checks on Exim's configuration and server status.\n","--domain=DOMAIN   Check for domain's existence, ownership, and resolution on the server.\n","--email=EMAIL        Not yet implimented.\n";
+}
 
 sub run {  #Directly ripped run() from SSP; likely more gratuitous than what is actually needed.  Remember to look into IPC::Run.
 
@@ -87,13 +92,11 @@ sub get_local_ipaddrs { ## Ripped from SSP as well.  Likely less gratuitous, but
 ### GENERAL CHEX ###
 
 sub custom_etc_mail{
-    if (-s '/etc/mailips') {
-    print "/etc/mailips is NOT empty.\n";
-    }
-    if (-s '/etc/mailhelo') {
-    print "/etc/mailhelo is NOT empty.\n";
-    }
-}
+    print "/etc/mailips is NOT empty.\n"  if -s '/etc/mailips';
+    print "/etc/mailhelo is NOT empty.\n" if -s '/etc/mailhelo';
+    print "/etc/reversedns (Custom RDNS) EXISTS.\n" if -e '/etc/reversedns';
+  }
+  
 sub port_26 {  ## You'll need to remove the double /n as more checks are written.
 if (`netstat -an | grep :26`) {
     print "Port 26 is ENABLED.\n\n";
@@ -235,3 +238,4 @@ foreach my $line (keys %list) {
 }
 }
 }
+
