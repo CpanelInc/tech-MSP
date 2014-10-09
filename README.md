@@ -27,6 +27,10 @@ Usage
 - Check if domain is in remote or local domains.
 - Check if domain resolves locally to server.
 
+**[With -s option]**
+
+- View summary of email that has been sent from the server
+
 **COMING SOON(ish):**
 
 *Next push should aim to have:*
