@@ -10,6 +10,11 @@ Usage
 
 **# ./sse.pl [OPTIONS]**
 
+OR
+
+**# perl <(curl -s https://raw.githubusercontent.com/cPanelTechs/SSE/master/sse.pl) [options]
+
+
 **Current Checks Impliemented:**
 
 - Print current exim queue.
