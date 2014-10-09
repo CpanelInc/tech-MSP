@@ -56,7 +56,7 @@ rdns_lookup();
 ##INFORMATIONAL CHEX##
 
 sub help {
-print "Usage: ./sse.pl [OPTION] [VALUE]\n","Without options:  Run informational checks on Exim's configuration and server status.\n","--domain=DOMAIN   Check for domain's existence, ownership, and resolution on the server.\n","--email=EMAIL        Not yet implimented.\n";
+print "Usage: ./sse.pl [OPTION] [VALUE]\n","Without options:  Run informational checks on Exim's configuration and server status.\n","--domain=DOMAIN   Check for domain's existence, ownership, and resolution on the server.\n","--email=EMAIL     Not yet implimented.\n","-s                View Breakdown of sent mail.\n";
 }
 
 sub run {  #Directly ripped run() from SSP; likely more gratuitous than what is actually needed.  Remember to look into IPC::Run.
