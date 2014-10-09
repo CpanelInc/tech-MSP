@@ -6,6 +6,7 @@ use Getopt::Long;
 use Term::ANSIColor qw(:constants);
 use POSIX;
 use File::Find;
+use Term::ANSIColor;
 
 $ENV{'PATH'} = '/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin';
 
@@ -13,9 +14,10 @@ $ENV{'PATH'} = '/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin';
 
 my %opts;
 my $domain;
+my $sent;
 my $help;
 
-GetOptions(\%opts, 'domain=s'=> \$domain, 'help'=>\$help) or die ("Please see --help\n");
+GetOptions(\%opts, 'domain=s'=> \$domain, 'sent:s'=> \$sent, 'help'=>\$help) or die ("Please see --help\n");
 
 ## GLOBALS ##
 
@@ -37,6 +39,10 @@ check_dkim();
 
 elsif ($help) { ##--help
 help();
+}
+
+elsif (defined $sent) {
+sent_email();
 }
 
 else { ## No options passed.
@@ -270,6 +276,40 @@ else {
 return;
 }
 }
+
+
+sub sent_email {
+open FILE, "/var/log/exim_mainlog";
+
+print color 'red';
+print "\nEmails by user: " . color 'reset';
+print "\n\n";
+our @system_users = "";
+
+while ( $lines_users = <FILE> ){
+if ( $lines_users=~/(U\=)(.+?)(\sP\=)/i ) {
+my $line_users = $2;
+push (@system_users, $line_users)
+}
+}
+my %count;
+$count{$_}++ foreach @system_users;
+while (my ($key, $value) = each(%count)) {
+	if ($key =~ /^$/ ) {
+		delete($count{$key});
+}
+}
+
+foreach my $value (reverse sort { $count{$a} <=> $count{$b} }  keys %count) {
+print " " . $count{$value} . " : " . $value . "\n";
+}
+
+print "\n\n";
+print colored ['red on_blue'], "Total:  " . scalar (@system_users - 1);
+print "\n";
+}
+
+
 }
 }
 
