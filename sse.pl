@@ -17,7 +17,7 @@ my $domain;
 my $sent;
 my $help;
 
-GetOptions(\%opts, 'domain=s'=> \$domain, 'sent:s'=> \$sent, 'help'=>\$help) or die ("Please see --help\n");
+GetOptions(\%opts, 'domain=s'=> \$domain, 'sent:s'=> \$sent, 'email:s'=> \$email, 'help'=>\$help) or die ("Please see --help\n");
 
 ## GLOBALS ##
 
@@ -45,6 +45,10 @@ elsif (defined $sent) {
 sent_email();
 }
 
+elsif (defined $email) {
+print "Email Section!\n";
+}
+
 else { ## No options passed.
 print "There are currently $queue_cnt messages in the Exim queue.\n";
 port_26();
@@ -56,7 +60,7 @@ rdns_lookup();
 ##INFORMATIONAL CHEX##
 
 sub help {
-print "Usage: ./sse.pl [OPTION] [VALUE]\n","Without options:  Run informational checks on Exim's configuration and server status.\n","--domain=DOMAIN   Check for domain's existence, ownership, and resolution on the server.\n","--email=EMAIL     Not yet implimented.\n","-s                View Breakdown of sent mail.\n";
+print "Usage: ./sse.pl [OPTION] [VALUE]\n","Without options:  Run informational checks on Exim's configuration and server status.\n","--domain=DOMAIN   Check for domain's existence, ownership, and resolution on the server.\n","--email=EMAIL     Email specific checks.\n","-s                View Breakdown of sent mail.\n";
 }
 
 sub run {  #Directly ripped run() from SSP; likely more gratuitous than what is actually needed.  Remember to look into IPC::Run.
