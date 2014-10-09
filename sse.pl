@@ -307,9 +307,116 @@ print " " . $count{$value} . " : " . $value . "\n";
 print "\n\n";
 print colored ['red on_blue'], "Total:  " . scalar (@system_users - 1);
 print "\n";
+
+
+print color 'red';
+print "\nEmail accounts sending out mail:\n\n";
+print color 'reset';
+
+
+open FILE, "/var/log/exim_mainlog";
+while ( $lines_email = <FILE>) {
+if ( $lines_email=~/(_login:|_plain:)(.+?)(\sS=)/i) {
+my $lines_emails = $2;
+push (@email_users, $lines_emails);
+}
+}
+my %email_count;
+$email_count{$_}++ foreach @email_users;
+while (my ($key, $value) = each(%email_count)) {
+	if ($key =~ /^$/) {
+		delete($email_count{$key});
+}
 }
 
+foreach my $value (reverse sort { $email_count{$a} <=> $email_count{$b} }  keys %email_count) {
+print " " . $email_count{$value} . " : " . $value . "\n";
+}
 
+print "\n";
+print colored ['red on_blue'], "Total: " . scalar (@email_users - 1);
+print "\n";
+
+
+## Section for current working directories
+
+print color 'red';
+print "\nCurrent working directories:\n\n\n";
+print color 'reset';
+
+
+open FILE, "/var/log/exim_mainlog";
+my @dirs;
+
+while ($dirs = <FILE>) {
+if ( $dirs=~/(cwd=)(.+?)(\s)/i) {
+my $dir = $2;
+push (@dirs, $dir);
+}
+}
+my %dirs;
+$dirs{$_}++ foreach @dirs;
+while (my ($key, $value) = each(%dirs)) {
+        if ($key =~ /^$/ ) {
+                delete($dirs[$key]);
+}
+}
+
+while (my ($key, $value) = each(%dirs)) {
+        if ($key =~ /^$/) {
+                delete($dirs{$key});
+}
+}
+
+foreach my $value (reverse sort { $dirs{$a} <=> $dirs{$b} }  keys %dirs) {
+print " " . $dirs{$value} . " : " . $value . "\n";
+}
+
+print "\n";
+print colored ['red on_blue'], "Total: " . scalar (@dirs - 1);
+print "\n";
+
+
+print color 'red';
+print "\nTop 20 Email Titles:\n\n\n";
+print color 'reset';
+
+open FILE, "/var/log/exim_mainlog";
+my @titles;
+
+while ($titles = <FILE>) {
+if ( $titles=~/((U=|_login:).+)((?<=T=\").+?(?=\"))(.+$)/i) {
+my $title = $3;
+push (@titles, $title);
+}
+}
+our %titlecount;
+$titlecount{$_}++ foreach @titles;
+while (my ($key, $value) = each(%titlecount)) {
+	if ($key =~ /^$/ ) {
+		delete($titlecount[$key]);
+}
+}
+
+my $limit = 20;
+my $loops = 0;
+foreach my $value (reverse sort { $titlecount{$a} <=> $titlecount{$b} }  keys %titlecount) {
+print " " . $titlecount{$value} . " : " . $value . "\n";
+$loops++;
+if ($loops >= $limit) {
+	last;
+}
+}
+print "\n\n";
+print colored ['red on_blue'], "Total: " . scalar (@titles - 1);
+print "\n\n";
+
+close FILE;
+
+
+
+
+}
 }
 }
 
