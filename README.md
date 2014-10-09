@@ -12,7 +12,7 @@ Usage
 
 OR
 
-**# perl <(curl -s https://raw.githubusercontent.com/cPanelTechs/SSE/master/sse.pl) [options]
+# perl <(curl -s https://raw.githubusercontent.com/cPanelTechs/SSE/master/sse.pl) [options]
 
 
 **Current Checks Impliemented:**
