@@ -169,15 +169,16 @@ while (<$remote_domain>) {
 
 sub domain_resolv {
 chomp($domain_ip = run('dig',$domain,'@8.8.4.4','+short'));
-#foreach (@local_ipaddrs_list) {
-#    if  (/^${domain_ip}$/) {
 if (grep {$_ eq $domain_ip} @local_ipaddrs_list) {
         print "The domain $domain resolves to IP: $domain_ip.\n";
         return;
     }
+    elsif ((!defined $domain_ip) || ($domain_ip eq '')) {
+    return;
+}
     else {
         print "The domain $domain DOES NOT resolve to this server.\n";
-        return; 
+	print "It currently resolves to: \n$domain_ip \n"; 
 }
 
 
@@ -242,11 +243,16 @@ foreach my $line (keys %list) {
 
 sub check_spf {
 my @check = qx/dig $domain TXT/;
-print "$domain has the folloiwng SPF records:\n";
+if ( grep ( m/.*spf.*/, @check) ) {
+print "$domain has the folloiwng SPF records:\n"; 
 foreach my $check (@check) {
 if ( $check =~ m/.*spf.*/) {
 print "$check";
 }
+}
+}
+else {
+return;
 }
 }
 
