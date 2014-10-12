@@ -48,6 +48,7 @@ sent_email();
 elsif (defined $email) {
 if ($email =~ /^([a-zA-Z0-9_\-\.]+)@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.)|(([a-zA-Z0-9\-]+\.)+))([a-zA-Z]{2,4}|[0-9]{1,3})(\]?)$/) {
 does_email_exist();
+email_forwarders();
 }
 else {
 die "Please enter a valid email address\n";
@@ -472,16 +473,20 @@ my $string = 'grep -3';
 my $domainstring = "www.$domain";
 my $lookupfile = '/usr/local/apache/conf/httpd.conf';
 @lines = qx/$string $domainstring $lookupfile/;
-@stuff = grep(/^.+?(\/.+\/.+$)/, @lines);
-$numlines = scalar(grep {defined $_} @stuff);
-if ( $numlines != 1 ) {
-pop @stuff;
-foreach $stuff (@stuff) {
-$doc_root = $stuff;
+@dlines = grep(/^.+?(\/.+\/.+$)/, @lines);
+$numlines = scalar(grep {defined $_} @dlines);
+if ( $numlines > 1 ) {
+pop @dlines;
+foreach $dlines (@dlines) {
+$doc_root = $dlines;
 }
+}
+elsif ($numlines < 1) {
+print_warning("[WARN] * No Document root found\n");
+return;
 }
 else {
-foreach (@stuff) {
+foreach (@dlines) {
 $doc_root = $_;
 }
 }
@@ -490,15 +495,38 @@ $doc_root = $_;
 
 sub does_email_exist {
 get_doc_root();
-my ($user, $domain) = $email =~ /(.*)@(.*)/;
-my $home = $1 if ($doc_root =~ m/DocumentRoot\s(\/.+?\/.+?\/)/);
-
-my @shadow = qx/cat $home\/etc\/$domain\/shadow/;
-if ( grep( /$user/, @shadow) ) {
+$| = 1;
+if ( (!defined $doc_root) || ($doc_root eq '') ) {
+return "\n";
+}
+elsif (defined $doc_root) {
+my ($users, $maildomain) = $email =~ /(.*)@(.*)/;
+if ($doc_root =~ m/DocumentRoot\s(\/.+?\/.+?\/)/) {
+open FILE, "$1\/etc\/$maildomain\/shadow";
+while (@file = <FILE>) { 
+#my @shadow = qx/cat $1\/etc\/$maildomain\/shadow/;
+if ( grep(/^$users/, @file) ) {
 print_info("[INFO] *");
 print_normal(" Email address exists on the server\n");
 }
 else {
 print_warning("[WARN] * Email does NOT exist on the server\n");
+}
+}
+}
+}
+}
+
+sub email_forwarders {
+$dir = '/etc/valiases/';
+opendir DIR, $dir or die "Cannot open $dir : $!\n";
+my @files = readdir DIR;
+foreach $file (@files) {
+open FILE, "$dir/$file" or die "Cannot open $file : $!\n";
+while ( $lines = <FILE> ) {
+if ($lines =~ /^$email/) {
+print_warning("[WARN] * Forwarder found in $file  :  $lines");
+}
+}
 }
 }
