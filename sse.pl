@@ -52,6 +52,7 @@ print "Email Section!\n";
 else { ## No options passed.
 print_info("\n[INFO] * "); 
 print_normal("There are currently $queue_cnt messages in the Exim queue.\n");
+nobodyspam_tweak();
 port_26();
 custom_etc_mail();
 check_blacklists();
@@ -164,7 +165,14 @@ print_normal(" $lines has RDNS entry:   $check\n");
 }
 }
 }
-
+sub nobodyspam_tweak{
+my @nobodytweak  = split (/=/,`grep nobodyspam /var/cpanel/cpanel.config`);
+chomp ($nobodyspam = pop @nobodytweak);
+print_warning ("[WARN] * Nobody user (nobodyspam) is prevented from sending mail.\n") if ($nobodyspam);
+if (!$nobodyspam) {
+print_info ("[INFO] *");
+print_normal(" Nobody user tweak (nobodyspam) is disabled.\n");
+}}
 ### DOMAIN CHEX ###
 
 sub hostname_check{
@@ -221,7 +229,7 @@ if (grep {$_ eq $domain_ip} @local_ipaddrs_list) {
 }
     else {
         print_warning("[WARN] * The domain $domain DOES NOT resolve to this server.\n");
-	print_warning("\t\\_ It currently resolves to:      $domain_ip \n");
+    print_warning("\t\\_ It currently resolves to:      $domain_ip \n");
 }
 
 
@@ -333,8 +341,8 @@ push (@system_users, $line_users)
 my %count;
 $count{$_}++ foreach @system_users;
 while (my ($key, $value) = each(%count)) {
-	if ($key =~ /^$/ ) {
-		delete($count{$key});
+    if ($key =~ /^$/ ) {
+        delete($count{$key});
 }
 }
 
@@ -360,8 +368,8 @@ push (@email_users, $lines_emails);
 my %email_count;
 $email_count{$_}++ foreach @email_users;
 while (my ($key, $value) = each(%email_count)) {
-	if ($key =~ /^$/) {
-		delete($email_count{$key});
+    if ($key =~ /^$/) {
+        delete($email_count{$key});
 }
 }
 
@@ -425,8 +433,8 @@ push (@titles, $title);
 our %titlecount;
 $titlecount{$_}++ foreach @titles;
 while (my ($key, $value) = each(%titlecount)) {
-	if ($key =~ /^$/ ) {
-		delete($titlecount[$key]);
+    if ($key =~ /^$/ ) {
+        delete($titlecount[$key]);
 }
 }
 
@@ -436,7 +444,7 @@ foreach my $value (reverse sort { $titlecount{$a} <=> $titlecount{$b} }  keys %t
 print " " . $titlecount{$value} . " : " . $value . "\n";
 $loops++;
 if ($loops >= $limit) {
-	last;
+    last;
 }
 }
 print "\n\n";
