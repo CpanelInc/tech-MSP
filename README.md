@@ -6,12 +6,6 @@ For (most of) your super cPanel w/ Exim server needs.
 Usage
 --------------
 
-**# wget https://raw.githubusercontent.com/cPanelTechs/SSE/master/sse.pl; chmod +x sse.pl**
-
-**# ./sse.pl [OPTIONS]**
-
-OR
-
 **# perl <(curl -s https://raw.githubusercontent.com/cPanelTechs/SSE/master/sse.pl) [options]
 
 
@@ -23,6 +17,7 @@ OR
 - Check if mail IPs are blacklisted
 - Show reverse DNS for mail IPs
 - Check for SPF and DKIM records
+- Check if nobody user is prevented from sending mail.
 
 **[With --domain option]**
 
