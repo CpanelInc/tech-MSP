@@ -46,7 +46,12 @@ sent_email();
 }
 
 elsif (defined $email) {
-print "Email Section!\n";
+if ($email =~ /^([a-zA-Z0-9_\-\.]+)@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.)|(([a-zA-Z0-9\-]+\.)+))([a-zA-Z]{2,4}|[0-9]{1,3})(\]?)$/) {
+does_email_exist();
+}
+else {
+die "Please enter a valid email address\n";
+}
 }
 
 else { ## No options passed.
@@ -457,5 +462,43 @@ close FILE;
 
 
 }
+}
+}
+
+sub get_doc_root {
+my ($user, $domain) = $email =~ /(.*)@(.*)/;
+my %used;
+my $string = 'grep -3';
+my $domainstring = "www.$domain";
+my $lookupfile = '/usr/local/apache/conf/httpd.conf';
+@lines = qx/$string $domainstring $lookupfile/;
+@stuff = grep(/^.+?(\/.+\/.+$)/, @lines);
+$numlines = scalar(grep {defined $_} @stuff);
+if ( $numlines != 1 ) {
+pop @stuff;
+foreach $stuff (@stuff) {
+$doc_root = $stuff;
+}
+}
+else {
+foreach (@stuff) {
+$doc_root = $_;
+}
+}
+}
+
+
+sub does_email_exist {
+get_doc_root();
+my ($user, $domain) = $email =~ /(.*)@(.*)/;
+my $home = $1 if ($doc_root =~ m/DocumentRoot\s(\/.+?\/.+?\/)/);
+
+my @shadow = qx/cat $home\/etc\/$domain\/shadow/;
+if ( grep( /$user/, @shadow) ) {
+print_info("[INFO] *");
+print_normal(" Email address exists on the server\n");
+}
+else {
+print_warning("[WARN] * Email does NOT exist on the server\n");
 }
 }
