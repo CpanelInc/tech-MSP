@@ -217,7 +217,7 @@ if (grep {$_ eq $domain_ip} @local_ipaddrs_list) {
         return;
     }
     elsif ((!defined $domain_ip) || ($domain_ip eq '')) {
-    return;
+    print_warning("[WARN] * Domain did not return an A record.  It is likely not registered or not pointed to any IP\n");
 }
     else {
         print_warning("[WARN] * The domain $domain DOES NOT resolve to this server.\n");
