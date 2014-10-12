@@ -50,11 +50,33 @@ print "Email Section!\n";
 }
 
 else { ## No options passed.
-print "There are currently $queue_cnt messages in the Exim queue.\n";
+print_info("\n[INFO] * "); 
+print_normal("There are currently $queue_cnt messages in the Exim queue.\n");
 port_26();
 custom_etc_mail();
 check_blacklists();
 rdns_lookup();
+}
+
+
+## Colors ##
+
+sub print_info {
+    my $text = shift;
+    print BOLD YELLOW ON_BLACK $text;
+    print color 'reset';
+}
+
+sub print_warning {
+    my $text = shift;
+    print BOLD RED ON_BLACK "$text";
+    print color 'reset';
+}
+
+sub print_normal {
+    my $text = shift;
+    print BOLD CYAN ON_BLACK "$text";
+    print color 'reset';
 }
 
 ##INFORMATIONAL CHEX##
@@ -104,18 +126,19 @@ sub get_local_ipaddrs { ## Ripped from SSP as well.  Likely less gratuitous, but
 ### GENERAL CHEX ###
 
 sub custom_etc_mail{
-    print "/etc/mailips is NOT empty.\n"  if -s '/etc/mailips';
-    print "/etc/mailhelo is NOT empty.\n" if -s '/etc/mailhelo';
-    print "/etc/reversedns (Custom RDNS) EXISTS.\n" if -e '/etc/reversedns';
+    print_warning("[WARN] * /etc/mailips is NOT empty.\n")  if -s '/etc/mailips';
+    print_warning("[WARN] * /etc/mailhelo is NOT empty.\n") if -s '/etc/mailhelo';
+    print_warning("[WARN] * /etc/reversedns (Custom RDNS) EXISTS.\n") if -e '/etc/reversedns';
   }
-  
+
 sub port_26 {  ## You'll need to remove the double /n as more checks are written.
 if (`netstat -an | grep :26`) {
-    print "Port 26 is ENABLED.\n\n";
+    print_info("[INFO] *");
+    print_normal(" Port 26 is ENABLED.\n");
     return;
 }
 else{
-    print "Port 26 is DISABLED.\n\n";
+    print_warning("[WARN] * Port 26 is DISABLED.\n");
 }
 }
 
@@ -130,7 +153,13 @@ while ( $lines = <FILE> ) {
 if ($lines =~ m/([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})/) {
 $lines = $1;
 my $check = qx/host $lines/;
-print "$lines has RDNS entry:   $check";
+if ($check =~ /NXDOMAIN/) {
+print_warning("[WARN] * $lines does not have a RDNS entry: $check\n");
+}
+else {
+print_info("[INFO] *");
+print_normal(" $lines has RDNS entry:   $check\n");
+}
 }
 }
 }
@@ -140,7 +169,7 @@ print "$lines has RDNS entry:   $check";
 
 sub hostname_check{
 if ($hostname eq $domain){
-    print "Your hostname $hostname appears to be the same as $domain.  Was this intentional?\n";
+    print_warning("[WARN] * Your hostname $hostname appears to be the same as $domain.  Was this intentional?\n");
     }}
 
 sub domain_exist {
@@ -148,14 +177,15 @@ open( USERDOMAINS, "/etc/userdomains" );
 while (<USERDOMAINS>) {
     if (/^$domain: (\S+)/i) {
         my $user = $1;
-        print "The domain $domain is owned by $user.\n";
+        print_info("\n[INFO] *");
+        print_normal(" The domain $domain is owned by $user.\n");
         my $suspchk = "/var/cpanel/suspended/$user";
             if (-e $suspchk) {
-                print "The user $user is SUSPENDED.\n";
+                print_warning("[WARN] * The user $user is SUSPENDED.\n");
             }
         return;
     }}
-        print "The domain $domain DOES NOT exist on this server.\n";
+        print_warning("[WARN] * The domain $domain DOES NOT exist on this server.\n");
 close (USERDOMAINS);
 }
 
@@ -164,14 +194,16 @@ sub check_local_or_remote {
 open my $loc_domain, '<', '/etc/localdomains';
 while (<$loc_domain>) {
     if (/^${domain}$/){
-        print "$domain is in LOCALDOMAINS.\n";      
+        print_info("[INFO] *");
+        print_normal(" $domain is in LOCALDOMAINS.\n");
         }}
     close $loc_domain;
 
 open my $remote_domain, '<', '/etc/remotedomains';
 while (<$remote_domain>) {
     if (/^${domain}$/){
-        print "$domain is in REMOTEDOMAINS.\n";
+        print_info("[INFO] *");
+        print_normal(" $domain is in REMOTEDOMAINS.\n");
         last;
         }}
     close $remote_domain;
@@ -180,15 +212,16 @@ while (<$remote_domain>) {
 sub domain_resolv {
 chomp($domain_ip = run('dig',$domain,'@8.8.4.4','+short'));
 if (grep {$_ eq $domain_ip} @local_ipaddrs_list) {
-        print "The domain $domain resolves to IP: $domain_ip.\n";
+        print_info("[INFO] *");
+        print_normal(" The domain $domain resolves to IP: \n\t \\_ $domain_ip\n");
         return;
     }
     elsif ((!defined $domain_ip) || ($domain_ip eq '')) {
     return;
 }
     else {
-        print "The domain $domain DOES NOT resolve to this server.\n";
-	print "It currently resolves to: \n$domain_ip \n"; 
+        print_warning("[WARN] * The domain $domain DOES NOT resolve to this server.\n");
+	print_warning("\t\\_ It currently resolves to:      $domain_ip \n");
 }
 
 
@@ -245,7 +278,7 @@ foreach my $line (keys %list) {
     return;
 }
     else {
-    print "$ip is listed on $line\n";
+    print_warning("[WARN] * $ip is listed on $line\n");
 }
 }
 }
@@ -254,10 +287,11 @@ foreach my $line (keys %list) {
 sub check_spf {
 my @check = qx/dig $domain TXT/;
 if ( grep ( m/.*spf.*/, @check) ) {
-print "$domain has the folloiwng SPF records:\n"; 
+print_info("[INFO] *");
+print_normal(" $domain has the folloiwng SPF records:\n");
 foreach my $check (@check) {
 if ( $check =~ m/.*spf.*/) {
-print "$check";
+print_normal("\t\\_ $check");
 }
 }
 }
@@ -271,8 +305,9 @@ my @check = qx/dig default._domainkey.$domain TXT/;
 if (@check) {
 foreach my $check (@check) {
 if ( $check =~ m/.*DKIM.*/ ) {
-print "$domain has the following domain keys:\n ";
-print $check;
+print_info("[INFO] *");
+print_normal(" $domain has the following domain keys:\n ");
+print_normal("\t\\_ $check");
 }
 }
 }
@@ -285,8 +320,7 @@ return;
 sub sent_email {
 open FILE, "/var/log/exim_mainlog";
 
-print color 'red';
-print "\nEmails by user: " . color 'reset';
+print_warning("\nEmails by user: ");
 print "\n\n";
 our @system_users = "";
 
@@ -313,9 +347,7 @@ print colored ['red on_blue'], "Total:  " . scalar (@system_users - 1);
 print "\n";
 
 
-print color 'red';
-print "\nEmail accounts sending out mail:\n\n";
-print color 'reset';
+print_warning("\nEmail accounts sending out mail:\n\n");
 
 
 open FILE, "/var/log/exim_mainlog";
@@ -344,9 +376,7 @@ print "\n";
 
 ## Section for current working directories
 
-print color 'red';
-print "\nCurrent working directories:\n\n\n";
-print color 'reset';
+print_warning("\nCurrent working directories:\n\n\n");
 
 
 open FILE, "/var/log/exim_mainlog";
@@ -381,9 +411,7 @@ print colored ['red on_blue'], "Total: " . scalar (@dirs - 1);
 print "\n";
 
 
-print color 'red';
-print "\nTop 20 Email Titles:\n\n\n";
-print color 'reset';
+print_warning("\nTop 20 Email Titles:\n\n\n");
 
 open FILE, "/var/log/exim_mainlog";
 my @titles;
@@ -423,4 +451,3 @@ close FILE;
 }
 }
 }
-
