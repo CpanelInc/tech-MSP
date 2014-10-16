@@ -56,6 +56,7 @@ die "Please enter a valid email address\n";
 }
 
 else { ## No options passed.
+is_exim_running();
 print_info("\n[INFO] * "); 
 print_normal("There are currently $queue_cnt messages in the Exim queue.\n");
 nobodyspam_tweak();
@@ -542,5 +543,17 @@ if ($lines =~ /^$email/) {
 print_warning("[WARN] * Forwarder found in $file  :  $lines");
 }
 }
+}
+}
+
+
+sub is_exim_running {
+my $check = qx/service exim status/;
+if ( $check =~ m/is\ running/ ) {
+print_info("\n[INFO] * ");
+print_normal("Exim is running");
+}
+else {
+print_warning("\n[WARN] * Exim is not running");
 }
 }
