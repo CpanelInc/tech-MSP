@@ -61,8 +61,8 @@ print_normal("There are currently $queue_cnt messages in the Exim queue.\n");
 nobodyspam_tweak();
 port_26();
 custom_etc_mail();
-check_blacklists();
 rdns_lookup();
+check_blacklists();
 }
 
 
@@ -160,6 +160,7 @@ while ( $lines = <FILE> ) {
 if ($lines =~ m/([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})/) {
 $lines = $1;
 my $check = qx/host $lines/;
+chomp($check);
 if ($check =~ /NXDOMAIN/) {
 print_warning("[WARN] * $lines does not have a RDNS entry: $check\n");
 }
@@ -242,23 +243,26 @@ if (grep {$_ eq $domain_ip} @local_ipaddrs_list) {
 sub check_blacklists {
 # Way more lists out there, but I'll add them later.
 my %list = (
-    'sbl-xbl.spamhaus.org'        => 'http://www.spamhaus.org',
-    'pbl.spamhaus.org'            => 'http://www.spamhaus.org',
-    'bl.spamcop.net'              => 'http://www.spamcop.net',
-    'dsn.rfc-ignorant.org'        => 'http://www.rfc-ignorant.org',
-    'postmaster.rfc-ignorant.org' => 'http://www.rfc.ignorant.org',
-    'abuse.rfc-ignorant.org'      => 'http://www.rfc.ignorant.org',
-    'whois.rfc-ignorant.org'      => 'http://www.rfc.ignorant.org',
-    'ipwhois.rfc-ignorant.org'    => 'http://www.rfc.ignorant.org',
-    'bogusmx.rfc-ignorant.org'    => 'http://www.rfc.ignorant.org',
-    'dnsbl.sorbs.net'             => 'http://www.sorbs.net',
-    'badconf.rhsbl.sorbs.net'     => 'http://www.sorbs.net',
-    'nomail.rhsbl.sorbs.net'      => 'http://www.sorbs.net',
-    'cbl.abuseat.org'             => 'http://www.abuseat.org/support',
-    'relays.visi.com'             => 'http://www.visi.com',
-    'list.dsbl.org'               => 'http://www.dsbl.org',
-    'opm.blitzed.org'             => 'http://www.blitzed.org',
-    'zen.spamhaus.org'            => 'http://www.spamhaus.org',
+    'sbl-xbl.spamhaus.org'        => 'Spamhaus',
+    'pbl.spamhaus.org'            => 'Spamhaus',
+    'sbl.spamhaus.org'            => 'Spamhaus',
+    'bl.spamcop.net'              => 'SpamCop',
+    'dsn.rfc-ignorant.org'        => 'Rfc-ignorant.org',
+    'postmaster.rfc-ignorant.org' => 'Rfc.ignorant.org',
+    'abuse.rfc-ignorant.org'      => 'Rfc.ignorant.org',
+    'whois.rfc-ignorant.org'      => 'Rfc.ignorant.org',
+    'ipwhois.rfc-ignorant.org'    => 'Rfc.ignorant.org',
+    'bogusmx.rfc-ignorant.org'    => 'Rfc.ignorant.org',
+    'dnsbl.sorbs.net'             => 'Sorbs',
+    'badconf.rhsbl.sorbs.net'     => 'Sorbs',
+    'nomail.rhsbl.sorbs.net'      => 'Sorbs',
+    'cbl.abuseat.org'             => 'Abuseat.org',
+    'relays.visi.com'             => 'Visi.com',
+    'list.dsbl.org'               => 'Dsbl.org',
+    'opm.blitzed.org'             => 'Blitzed.org',
+    'zen.spamhaus.org'            => 'Spamhaus',
+    'bl.spamcannibal.org'         => 'Spamcannibal',
+    'ubl.unsubscore.com'          => 'LashBack',
 );
 
 # Grab the mail addresses
@@ -270,29 +274,39 @@ my @ips = '';
 foreach my $files (@files) {
 open FILE, "$files";
 while ( $lines = <FILE> ) {
-if ($lines =~ m/([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})/) {
-$lines = $1;
+if ($lines =~ m/([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})/) {
+$lines = "$1\.$2\.$3\.$4";
+$reverse_lines = "$4\.$3\.$2\.$1";
 chomp $lines;
+chomp $reverse_lines;
 push @ips, $lines;
+push @reverse_ips, $reverse_lines;
 }
 }
 close FILE;
 }
 
+
 shift @ips;
 
+print_info("[INFO] * ");
+print_normal("Checking Blacklists:\n");
 
-foreach my $line (keys %list) {
-    foreach my $ip (@ips) {
-    my $host = "$ip.$line";
-    my $ret = qx/dig +short $host/;
-
-    my $status = $ret ? "is listed" : "not listed";
-    if ( $status eq "not listed" ) {
-    return;
+foreach $reverse_ip (@reverse_ips) {
+my $ip = shift @ips;
+while (($key, $value) = each %list) {
+my $host = "$reverse_ip.$key\n";
+chomp($host);
+$ret = run("host","$host");
+$ret2 = grep(/(NXDOMAIN|SERVFAIL)/, $ret);
+$status = $ret2 ? "not listed" : "is listed";
+if ($status eq 'not listed') {
+print "";
 }
-    else {
-    print_warning("[WARN] * $ip is listed on $line\n");
+else {
+print_warning("\t\\_");
+print_normal(" $ip ");
+print_warning("$status on $value\n");
 }
 }
 }
