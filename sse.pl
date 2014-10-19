@@ -134,6 +134,7 @@ sub get_local_ipaddrs { ## Ripped from SSP as well.  Likely less gratuitous, but
 ### GENERAL CHEX ###
 
 sub custom_etc_mail{
+    print_warning("/etc/exim.conf.local (Custom Exim Configuration) EXISTS.\n") if -e '/etc/exim.conf.local';
     print_warning("[WARN] * /etc/mailips is NOT empty.\n")  if -s '/etc/mailips';
     print_warning("[WARN] * /etc/mailhelo is NOT empty.\n") if -s '/etc/mailhelo';
     print_warning("[WARN] * /etc/reversedns (Custom RDNS) EXISTS.\n") if -e '/etc/reversedns';
