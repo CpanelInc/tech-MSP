@@ -31,6 +31,7 @@ get_local_ipaddrs();
 if ($domain){ ## --domain{
 hostname_check();
 domain_exist();
+domain_filters();
 check_local_or_remote();
 domain_resolv();
 check_spf();
@@ -204,6 +205,10 @@ while (<USERDOMAINS>) {
     }}
         print_warning("[WARN] * The domain $domain DOES NOT exist on this server.\n");
 close (USERDOMAINS);
+}
+
+sub domain_filters {
+print_warning ("[WARN] * The virtual filter for $domain is NOT empty (/etc/vfilters/$domain).\n") if -s "/etc/vfilters/$domain";
 }
 
 sub check_local_or_remote {

@@ -26,6 +26,7 @@ Usage
 - Check if domain is identical to hostname.
 - Check if domain is in remote or local domains.
 - Check if domain resolves locally to server.
+- Check if domain has any virtual filters.
 
 **[With --email option]**
 
