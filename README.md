@@ -33,6 +33,7 @@ Usage
 - Check if e-mail exists on server.
 - Check if e-mail has forwarders.
 - Check if e-mail has an autoresponder enabled.
+- Check if mailbox has filters.
 
 **[With -s option]**
 

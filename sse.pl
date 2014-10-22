@@ -50,6 +50,7 @@ elsif (defined $email) {
 if ($email =~ /^([a-zA-Z0-9_\-\.]+)@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.)|(([a-zA-Z0-9\-]+\.)+))([a-zA-Z]{2,4}|[0-9]{1,3})(\]?)$/) {
 does_email_exist();
 email_valiases();
+email_filters();
 }
 else {
 die "Please enter a valid email address\n";
@@ -554,7 +555,13 @@ print_warning("[WARN] * Forwarder found in $file  :  $lines");
 }
 }
 }
-
+sub email_filters {
+get_doc_root();
+$| = 1;
+my ($user, $maildomain) = $email =~ /(.*)@(.*)/;
+        if ($doc_root =~ m/DocumentRoot\s(\/.+?\/.+?\/)/) {
+        print_warning("[WARN] * E-mail filter files exist for mailbox $email.\n") if -e "$1\/etc\/$maildomain\/$user\/filter";
+}}
 
 sub is_exim_running {
 my $check = qx/service exim status/;
