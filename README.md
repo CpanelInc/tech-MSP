@@ -27,6 +27,12 @@ Usage
 - Check if domain is in remote or local domains.
 - Check if domain resolves locally to server.
 
+**[With --email option]**
+
+- Check if e-mail exists on server.
+- Check if e-mail has forwarders.
+- Check if e-mail has an autoresponder enabled.
+
 **[With -s option]**
 
 - View summary of email that has been sent from the server

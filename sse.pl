@@ -48,7 +48,7 @@ sent_email();
 elsif (defined $email) {
 if ($email =~ /^([a-zA-Z0-9_\-\.]+)@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.)|(([a-zA-Z0-9\-]+\.)+))([a-zA-Z]{2,4}|[0-9]{1,3})(\]?)$/) {
 does_email_exist();
-email_forwarders();
+email_valiases();
 }
 else {
 die "Please enter a valid email address\n";
@@ -533,7 +533,7 @@ print_warning("[WARN] * Email does NOT exist on the server\n");
 }
 }
 
-sub email_forwarders {
+sub email_valiases {
 $dir = '/etc/valiases/';
 opendir DIR, $dir or die "Cannot open $dir : $!\n";
 my @files = readdir DIR;
@@ -541,6 +541,9 @@ foreach $file (@files) {
 open FILE, "$dir/$file" or die "Cannot open $file : $!\n";
 while ( $lines = <FILE> ) {
 if ($lines =~ /^$email/) {
+if  ($lines =~ /\.\bautorespond/){
+print_warning( "[WARN] * Autoresponder found in $file : $lines");}
+else{
 print_warning("[WARN] * Forwarder found in $file  :  $lines");
 }
 }
@@ -557,4 +560,4 @@ print_normal("Exim is running");
 else {
 print_warning("\n[WARN] * Exim is not running");
 }
-}
+}}
