@@ -39,6 +39,10 @@ Usage
 
 - View summary of email that has been sent from the server
 
+**[With -b option]**
+
+- Check Main IP and IPs in /etc/ips for blacklistings
+
 **COMING SOON(ish):**
 
 *Next push should aim to have:*
