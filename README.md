@@ -6,7 +6,7 @@ For (most of) your super cPanel w/ Exim server needs.
 Usage
 --------------
 
-**# perl <(curl -s https://raw.githubusercontent.com/cPanelTechs/SSE/master/sse.pl) [options]
+**# perl <(curl -s https://raw.githubusercontent.com/cPanelTechs/SSE/master/sse.pl) [options]**
 
 
 **Current Checks Impliemented:**
