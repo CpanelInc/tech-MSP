@@ -15,9 +15,10 @@ $ENV{'PATH'} = '/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin';
 my %opts;
 my $domain;
 my $sent;
+my $blacklists;
 my $help;
 
-GetOptions(\%opts, 'domain=s'=> \$domain, 'sent:s'=> \$sent, 'email:s'=> \$email, 'help'=>\$help) or die ("Please see --help\n");
+GetOptions(\%opts, 'domain=s'=> \$domain, 'sent:s'=> \$sent, 'email:s'=> \$email, 'blacklists:s'=> \$blacklists, 'help'=>\$help) or die ("Please see --help\n");
 
 ## GLOBALS ##
 
@@ -56,6 +57,9 @@ else {
 die "Please enter a valid email address\n";
 }
 }
+elsif (defined $blacklists) {
+check_blacklists();
+}
 
 else { ## No options passed.
 is_exim_running();
@@ -65,7 +69,6 @@ nobodyspam_tweak();
 port_26();
 custom_etc_mail();
 rdns_lookup();
-check_blacklists();
 }
 
 
