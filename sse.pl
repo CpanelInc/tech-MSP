@@ -52,6 +52,7 @@ if ($email =~ /^([a-zA-Z0-9_\-\.]+)@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.)|((
 does_email_exist();
 email_valiases();
 email_filters();
+email_quota();
 }
 else {
 die "Please enter a valid email address\n";
@@ -534,6 +535,7 @@ print_normal(" Email address exists on the server\n");
 }
 else {
 print_warning("[WARN] * Email does NOT exist on the server\n");
+exit;
 }
 }
 }
@@ -573,4 +575,34 @@ print_normal("Exim is running");
 else {
 print_warning("\n[WARN] * Exim is not running");
 }
-}}
+}
+sub email_quota {
+get_doc_root();
+if ($doc_root =~ m/(\/.+?\/.+?\/)/) {
+$home = $1;
+}
+if ($email =~ m/(^.+?)(@)(.+$)/) {
+$domain = $3;
+$name = $1;
+}
+
+my $file = "$home/etc/$domain/quota";
+
+open FILE, "$file";
+
+while ( $lines = <FILE> ) {
+if ( $lines =~ m/$name/ ) {
+my @line = split(/:/, $lines);
+my $quota_value = $line[1];
+my $quota = ( $quota_value / 1048576 );
+print_info("[INFO] * ");
+print_normal("Mailbox Quota: " . $quota . " MB\n");
+}
+else {
+print_info("[INFO] * ");
+print_normal("Mailbox Quota: Unlimited\n");
+}
+}
+}
+}
+
