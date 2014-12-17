@@ -601,6 +601,7 @@ print_normal("Mailbox Quota: " . $quota . " MB\n");
 else {
 print_info("[INFO] * ");
 print_normal("Mailbox Quota: Unlimited\n");
+return;
 }
 }
 }
