@@ -67,6 +67,7 @@ is_exim_running();
 print_info("\n[INFO] * "); 
 print_normal("There are currently $queue_cnt messages in the Exim queue.\n");
 nobodyspam_tweak();
+check_for_phphandler();
 port_26();
 custom_etc_mail();
 rdns_lookup();
@@ -576,6 +577,24 @@ else {
 print_warning("\n[WARN] * Exim is not running");
 }
 }
+
+sub check_for_phphandler {
+     my $phpconf = '/usr/local/apache/conf/php.conf.yaml';
+     open my $phpconf_fh, '<', $phpconf;
+         while (<$phpconf_fh>) {
+        if (/^php5:[ \t]+['"]?([^'"]+)/) {
+            $php5handler = $1;
+        }
+}
+close $phpconf_fh;
+chomp $php5handler;
+if ($php5handler eq "suphp"){
+print_info("[INFO] * ");
+print_normal("PHP5's handler is suPHP.\n");
+}
+print_warning("[WARN] * PHP5's handler is $php5handler.\n") if $php5handler ne "suphp";
+}
+
 sub email_quota {
 get_doc_root();
 if ($doc_root =~ m/(\/.+?\/.+?\/)/) {
@@ -606,4 +625,3 @@ return;
 }
 }
 }
-

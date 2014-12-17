@@ -18,6 +18,7 @@ Usage
 - Show reverse DNS for mail IPs
 - Check for SPF and DKIM records
 - Check if nobody user is prevented from sending mail.
+- Check server's PHP handler (PHP5 only at this time.)
 
 **[With --domain option]**
 
