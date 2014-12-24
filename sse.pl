@@ -64,13 +64,16 @@ check_blacklists();
 
 else { ## No options passed.
 is_exim_running();
-print_info("\n[INFO] * "); 
+print_info("\n[INFO] * ");
 print_normal("There are currently $queue_cnt messages in the Exim queue.\n");
 nobodyspam_tweak();
 check_for_phphandler();
 port_26();
 custom_etc_mail();
 rdns_lookup();
+check_filtered_25();
+check_filtered_26();
+check_filtered_993();
 }
 
 
@@ -155,6 +158,7 @@ if (`netstat -an | grep :26`) {
 }
 else{
     print_warning("[WARN] * Port 26 is DISABLED.\n");
+    $port_is_disabled = "DISABLED";
 }
 }
 
@@ -528,7 +532,7 @@ elsif (defined $doc_root) {
 my ($users, $maildomain) = $email =~ /(.*)@(.*)/;
 if ($doc_root =~ m/DocumentRoot\s(\/.+?\/.+?\/)/) {
 open FILE, "$1\/etc\/$maildomain\/shadow";
-while (@file = <FILE>) { 
+while (@file = <FILE>) {
 #my @shadow = qx/cat $1\/etc\/$maildomain\/shadow/;
 if ( grep(/^$users/, @file) ) {
 print_info("[INFO] *");
@@ -622,6 +626,106 @@ print_info("[INFO] * ");
 print_normal("Mailbox Quota: Unlimited\n");
 return;
 }
+}
+
+sub check_filtered_25 {
+my @scan = qx/nmap localhost -p 25/;
+
+foreach $scan (@scan) {
+my $result = $1 if $scan =~ m/25.+?\s(.+?)\s/;
+if (!defined $result || $result eq '') {
+print "";
+}
+else {
+if ($result eq "open") {
+print_info("[INFO] * ");
+print_normal("Port 25 is $result\n");
+return;
+}
+else {
+if ($result eq "closed") {
+print_warning("[WARN] * Port 25 is $result\n");
+return;
+}
+else {
+if ($result eq "filtered") {
+print_warning("[WARN] * Port 25 is $result\n");
+return;
+}
+}
+}
+}
+}
+
+sub check_filtered_26 {
+my @scan = qx/nmap localhost -p 26/;
+
+if (!defined $port_is_disabled) {
+foreach $scan (@scan) {
+my $result = $1 if $scan =~ m/26.+?\s(.+?)\s/;
+if (!defined $result || $result eq '') {
+print "";
+}
+else {
+if ($result eq "open") {
+print_info("[INFO] * ");
+print_normal("Port 26 is $result\n");
+return;
+}
+else {
+if ($result eq "closed") {
+print_warning("[WARN] * Port 26 is $result\n");
+return;
+}
+else {
+if ($result eq "filtered") {
+print_warning("[WARN] * Port 26 is $result\n");
+return;
+}
+}
+}
+}
+}
+}
+else {
+if ($port_is_disabled =~ m/DISABLED/) {
+return;
+}
+}
+}
+
+sub check_filtered_993 {
+my @scan = qx/nmap localhost -p 993/;
+
+foreach $scan (@scan) {
+my $result = $1 if $scan =~ m/993.+?\s(.+?)\s/;
+if (!defined $result || $result eq '') {
+print "";
+}
+else {
+if ($result eq "open") {
+print_info("[INFO] * ");
+print_normal("Port 993 is $result\n");
+return;
+}
+else {
+if ($result eq "closed") {
+print_warning("[WARN] * Port 993 is $result\n");
+return;
+}
+else {
+if ($result eq "filtered") {
+print_warning("[WARN] * Port 993 is $result\n");
+return;
+}
+}
+}
+}
+}
+}
+
+
+
 }
 }
 }
