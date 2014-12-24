@@ -37,6 +37,7 @@ check_local_or_remote();
 domain_resolv();
 check_spf();
 check_dkim();
+mx_consistency();
 }
 
 elsif ($help) { ##--help
@@ -724,8 +725,22 @@ return;
 }
 }
 
+sub mx_consistency {
 
+my $mxcheck_local = qx/dig mx \@localhost $domain +short/;
+my $mxcheck_remote = qx/dig mx \@8.8.8.8 $domain +short/;
+
+if ($mxcheck_local eq $mxcheck_remote) {
+return;
+}
+else {
+print_warning("[WARN] * Local MX does not match remote MX\n ");
+print_info("\t\\_ Local MX: $domain IN MX $mxcheck_local\n");
+print_info("\t\\_ Remote MX: $domain IN MX $mxcheck_remote\n");
+}
+}
 
 }
 }
 }
+
