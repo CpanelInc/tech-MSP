@@ -426,9 +426,9 @@ sub domain_resolv {
             }
 
             print "\n\n";
-            print colored ['red on_blue'],
-              "Total:  " . scalar( @system_users - 1 );
-            print "\n";
+	    print "===================\n";
+            print " Total:  " . scalar( @system_users - 1 );
+            print "\n===================\n";
 
             print_warning("\nEmail accounts sending out mail:\n\n");
 
@@ -455,9 +455,9 @@ sub domain_resolv {
             }
 
             print "\n";
-            print colored ['red on_blue'],
-              "Total: " . scalar( @email_users - 1 );
-            print "\n";
+            print "===================\n";
+            print "Total: " . scalar( @email_users - 1 );
+            print "\n===================\n";
 
 ## Section for current working directories
 
@@ -493,8 +493,9 @@ sub domain_resolv {
             }
 
             print "\n";
-            print colored ['red on_blue'], "Total: " . scalar( @dirs - 1 );
-            print "\n";
+            print "===================\n"; 
+            print "Total: " . scalar( @dirs - 1 );
+            print "\n===================\n";
 
             print_warning("\nTop 20 Email Titles:\n\n\n");
 
@@ -528,8 +529,9 @@ sub domain_resolv {
                 }
             }
             print "\n\n";
-            print colored ['red on_blue'], "Total: " . scalar( @titles - 1 );
-            print "\n\n";
+            print "===================\n"; 
+            print "Total: " . scalar( @titles - 1 );
+            print "\n===================\n\n";
 
             close FILE;
 
