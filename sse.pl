@@ -83,9 +83,7 @@ else {    ## No options passed.
     port_26();
     custom_etc_mail();
     rdns_lookup();
-    check_filtered_25();
-    check_filtered_26();
-    check_filtered_993();
+    check_closed_ports();
 }
 
 ## Colors ##
@@ -178,7 +176,6 @@ sub port_26 { ## You'll need to remove the double /n as more checks are written.
     }
     else {
         print_warning("[WARN] * Port 26 is DISABLED.\n");
-        $port_is_disabled = "DISABLED";
     }
 }
 
@@ -681,105 +678,22 @@ sub email_valiases {
             }
         }
 
-        sub check_filtered_25 {
-            my @scan = qx/nmap localhost -p 25/;
+	    sub check_closed_ports {
 
-            foreach $scan (@scan) {
-                my $result = $1 if $scan =~ m/25.+?\s(.+?)\s/;
-                if ( !defined $result || $result eq '' ) {
-                    print "";
-                }
-                else {
-                    if ( $result eq "open" ) {
-                        print_info("[INFO] * ");
-                        print_normal("Port 25 is $result\n");
-                        return;
-                    }
-                    else {
-                        if ( $result eq "closed" ) {
-                            print_warning("[WARN] * Port 25 is $result\n");
-                            return;
-                        }
-                        else {
-                            if ( $result eq "filtered" ) {
-                                print_warning("[WARN] * Port 25 is $result\n");
-                                return;
-                            }
-                        }
-                    }
-                }
-            }
+my $command = qx/iptables -nL | grep DROP/;
+my @rules = split /\n/, $command;
 
-            sub check_filtered_26 {
-                my @scan = qx/nmap localhost -p 26/;
-
-                if ( !defined $port_is_disabled ) {
-                    foreach $scan (@scan) {
-                        my $result = $1 if $scan =~ m/26.+?\s(.+?)\s/;
-                        if ( !defined $result || $result eq '' ) {
-                            print "";
-                        }
-                        else {
-                            if ( $result eq "open" ) {
-                                print_info("[INFO] * ");
-                                print_normal("Port 26 is $result\n");
-                                return;
-                            }
-                            else {
-                                if ( $result eq "closed" ) {
-                                    print_warning(
-                                        "[WARN] * Port 26 is $result\n");
-                                    return;
-                                }
-                                else {
-                                    if ( $result eq "filtered" ) {
-                                        print_warning(
-                                            "[WARN] * Port 26 is $result\n");
-                                        return;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                else {
-                    if ( $port_is_disabled =~ m/DISABLED/ ) {
-                        return;
-                    }
-                }
-            }
-
-            sub check_filtered_993 {
-                my @scan = qx/nmap localhost -p 993/;
-
-                foreach $scan (@scan) {
-                    my $result = $1 if $scan =~ m/993.+?\s(.+?)\s/;
-                    if ( !defined $result || $result eq '' ) {
-                        print "";
-                    }
-                    else {
-                        if ( $result eq "open" ) {
-                            print_info("[INFO] * ");
-                            print_normal("Port 993 is $result\n");
-                            return;
-                        }
-                        else {
-                            if ( $result eq "closed" ) {
-                                print_warning("[WARN] * Port 993 is $result\n");
-                                return;
-                            }
-                            else {
-                                if ( $result eq "filtered" ) {
-                                    print_warning(
-                                        "[WARN] * Port 993 is $result\n");
-                                    return;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
+@list = grep( /.*(:25\s|:26\s|:465\s|:587\s).*/, @rules );
+if (!@list) {
+print "";
+}
+else {
+print_info("[INFO] * Blocked ports:\n");
+foreach (@list) {
+print_normal("\t\\_ " . $_ . "\n");
+}
+}
+}
             sub mx_consistency {
 
                 my $mxcheck_local  = qx/dig mx \@localhost $domain +short/;
@@ -800,5 +714,5 @@ sub email_valiases {
 
         }
     }
-}
+
 
