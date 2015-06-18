@@ -458,7 +458,7 @@ sub domain_resolv {
 
 ## Section for current working directories
 
-            print_warning("\nCurrent working directories:\n\n\n");
+            print_warning("\nDirectories mail is originating from:\n\n\n");
 
             open FILE, "/var/log/exim_mainlog";
             my @dirs;
