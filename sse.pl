@@ -453,7 +453,7 @@ sub domain_resolv {
 
             print "\n";
             print "===================\n";
-            print "Total: " . scalar( @email_users - 1 );
+            print "Total: " . scalar( @email_users );
             print "\n===================\n";
 
 ## Section for current working directories
