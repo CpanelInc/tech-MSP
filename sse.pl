@@ -592,7 +592,8 @@ sub does_email_exist {
     get_doc_root();
     $| = 1;
     if ( ( !defined $doc_root ) || ( $doc_root eq '' ) ) {
-        return "\n";
+	print_warning("[WARN] * Document root not found to find information from the user's shadow file.  Verify that the domain and user's directories exist.\n");
+	exit;
     }
     elsif ( defined $doc_root ) {
         my ( $users, $maildomain ) = $email =~ /(.*)@(.*)/;
