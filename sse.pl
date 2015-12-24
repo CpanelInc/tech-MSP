@@ -274,24 +274,24 @@ sub check_local_or_remote {
 }
 
 sub mx_check {
-@mx_record = qx/dig mx $domain +short/;
-chomp(@mx_record);
-my @dig_mx_ip;
+    @mx_record = qx/dig mx $domain +short/;
+    chomp(@mx_record);
+    my @dig_mx_ip;
 
-foreach $mx_record(@mx_record) {
-$dig_mx_ip = qx/dig $mx_record +short/;
-push(@dig_mx_ip, $dig_mx_ip);
-chomp(@dig_mx_ip);
+    foreach $mx_record (@mx_record) {
+        $dig_mx_ip = qx/dig $mx_record +short/;
+        push( @dig_mx_ip, $dig_mx_ip );
+        chomp(@dig_mx_ip);
 
-}
+    }
 
-foreach my $mx_record(@mx_record) {
-print_info("\t \\_ MX Record: $mx_record\n");
-}
-foreach (@mx_record) {
-print_info("\t\t \\_ " . qx/dig $_ +short/);
+    foreach my $mx_record (@mx_record) {
+        print_info("\t \\_ MX Record: $mx_record\n");
+    }
+    foreach (@mx_record) {
+        print_info( "\t\t \\_ " . qx/dig $_ +short/ );
 
-}
+    }
 }
 
 sub domain_resolv {
@@ -438,14 +438,16 @@ sub domain_resolv {
                 }
             }
 
-            foreach my $value ( reverse sort { $count{$a} <=> $count{$b} }
-                keys %count )
+            foreach my $value (
+                reverse sort { $count{$a} <=> $count{$b} }
+                keys %count
+              )
             {
                 print " " . $count{$value} . " : " . $value . "\n";
             }
 
             print "\n\n";
-	    print "===================\n";
+            print "===================\n";
             print " Total:  " . scalar( @system_users - 1 );
             print "\n===================\n";
 
@@ -466,16 +468,17 @@ sub domain_resolv {
                 }
             }
 
-            foreach
-              my $value ( reverse sort { $email_count{$a} <=> $email_count{$b} }
-                keys %email_count )
+            foreach my $value (
+                reverse sort { $email_count{$a} <=> $email_count{$b} }
+                keys %email_count
+              )
             {
                 print " " . $email_count{$value} . " : " . $value . "\n";
             }
 
             print "\n";
             print "===================\n";
-            print "Total: " . scalar( @email_users );
+            print "Total: " . scalar(@email_users);
             print "\n===================\n";
 
 ## Section for current working directories
@@ -512,7 +515,7 @@ sub domain_resolv {
             }
 
             print "\n";
-            print "===================\n"; 
+            print "===================\n";
             print "Total: " . scalar( @dirs - 1 );
             print "\n===================\n";
 
@@ -537,9 +540,10 @@ sub domain_resolv {
 
             my $limit = 20;
             my $loops = 0;
-            foreach
-              my $value ( reverse sort { $titlecount{$a} <=> $titlecount{$b} }
-                keys %titlecount )
+            foreach my $value (
+                reverse sort { $titlecount{$a} <=> $titlecount{$b} }
+                keys %titlecount
+              )
             {
                 print " " . $titlecount{$value} . " : " . $value . "\n";
                 $loops++;
@@ -548,7 +552,7 @@ sub domain_resolv {
                 }
             }
             print "\n\n";
-            print "===================\n"; 
+            print "===================\n";
             print "Total: " . scalar( @titles - 1 );
             print "\n===================\n\n";
 
@@ -643,13 +647,15 @@ sub email_valiases {
     }
 
     sub is_exim_running {
-        my $check = qx/service exim status/;
-        if ( $check =~ m/is\ running/ ) {
-            print_info("\n[INFO] * ");
-            print_normal("Exim is running");
+
+        my $exim_port = qx/lsof -n -P -i :25/;
+
+        if ( $exim_port =~ m/exim.+LISTEN*/ ) {
+            print_info("[INFO] * ");
+            print_normal("Exim is running on port 25");
         }
         else {
-            print_warning("\n[WARN] * Exim is not running");
+            print_warning("[WARN] * Exim is not running on port 25");
         }
     }
 
@@ -700,59 +706,55 @@ sub email_valiases {
             }
         }
 
-	    sub check_closed_ports {
+        sub check_closed_ports {
 
-my $command = qx/iptables -nL | grep DROP/;
-my @rules = split /\n/, $command;
+            my $command = qx/iptables -nL | grep DROP/;
+            my @rules = split /\n/, $command;
 
-@list = grep( /.*(:25\s|:26\s|:465\s|:587\s).*/, @rules );
-if (!@list) {
-print "";
-}
-else {
-print_info("[INFO] * Blocked ports:\n");
-foreach (@list) {
-print_normal("\t\\_ " . $_ . "\n");
-}
-}
-}
-            sub mx_consistency {
-
-		my $main_ip = qx/hostname -i/;
-		chomp($main_ip);
-                my @mxcheck_local  = qx/dig mx \@$main_ip $domain +short/;
-                my @mxcheck_remote = qx/dig mx \@8.8.8.8 $domain +short/;
-
-                if ( @mxcheck_local eq @mxcheck_remote ) {
-                    print_info("[INFO]  Remote and local MX lookups match\n");
-                
-		foreach (@mxcheck_local) {
-                    print_info(
-                        "\t\\_ Local MX: $domain IN MX $_");
+            @list = grep( /.*(:25\s|:26\s|:465\s|:587\s).*/, @rules );
+            if ( !@list ) {
+                print "";
+            }
+            else {
+                print_info("[INFO] * Blocked ports:\n");
+                foreach (@list) {
+                    print_normal( "\t\\_ " . $_ . "\n" );
                 }
-			print "\n";
-                 foreach (@mxcheck_remote) {
-                    print_info(
-                        "\t\\_ Remote MX: $domain IN MX $_");
-                   }
-}
+            }
+        }
 
-                else {
-                    print_warning(
-                        "[WARN] * Local MX does not match remote MX\n ");
-		foreach (@mxcheck_local) {
-                    print_info(
-                        "\t\\_ Local MX: $domain IN MX $_");
-		}
-		print "\n";
-		 foreach (@mxcheck_remote) {
-                    print_info(
-                        "\t\\_ Remote MX: $domain IN MX $_");
-		   }	
+        sub mx_consistency {
+
+            my $main_ip = qx/hostname -i/;
+            chomp($main_ip);
+            my @mxcheck_local  = qx/dig mx \@$main_ip $domain +short/;
+            my @mxcheck_remote = qx/dig mx \@8.8.8.8 $domain +short/;
+
+            if ( @mxcheck_local eq @mxcheck_remote ) {
+                print_info("[INFO]  Remote and local MX lookups match\n");
+
+                foreach (@mxcheck_local) {
+                    print_info("\t\\_ Local MX: $domain IN MX $_");
                 }
+                print "\n";
+                foreach (@mxcheck_remote) {
+                    print_info("\t\\_ Remote MX: $domain IN MX $_");
+                }
+            }
 
+            else {
+                print_warning("[WARN] * Local MX does not match remote MX\n ");
+                foreach (@mxcheck_local) {
+                    print_info("\t\\_ Local MX: $domain IN MX $_");
+                }
+                print "\n";
+                foreach (@mxcheck_remote) {
+                    print_info("\t\\_ Remote MX: $domain IN MX $_");
+                }
             }
 
         }
+
+    }
 }
 
