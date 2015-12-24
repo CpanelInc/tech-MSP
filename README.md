@@ -1,7 +1,7 @@
 SSE
 ================
 
-For (most of) your super cPanel w/ Exim server needs.
+Exim email information utility for cPanel servers
 
 Usage
 --------------
