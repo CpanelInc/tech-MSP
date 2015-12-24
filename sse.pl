@@ -41,10 +41,11 @@ if ($domain) {    ## --domain{
     domain_exist();
     domain_filters();
     check_local_or_remote();
+    mx_check();
+    mx_consistency();
     domain_resolv();
     check_spf();
     check_dkim();
-    mx_consistency();
 }
 
 elsif ($help) {    ##--help
@@ -270,6 +271,27 @@ sub check_local_or_remote {
         }
     }
     close $remote_domain;
+}
+
+sub mx_check {
+@mx_record = qx/dig mx $domain +short/;
+chomp(@mx_record);
+my @dig_mx_ip;
+
+foreach $mx_record(@mx_record) {
+$dig_mx_ip = qx/dig $mx_record +short/;
+push(@dig_mx_ip, $dig_mx_ip);
+chomp(@dig_mx_ip);
+
+}
+
+foreach my $mx_record(@mx_record) {
+print_info("\t \\_ MX Record: $mx_record\n");
+}
+foreach (@mx_record) {
+print_info("\t\t \\_ " . qx/dig $_ +short/);
+
+}
 }
 
 sub domain_resolv {
@@ -696,23 +718,41 @@ print_normal("\t\\_ " . $_ . "\n");
 }
             sub mx_consistency {
 
-                my $mxcheck_local  = qx/dig mx \@localhost $domain +short/;
-                my $mxcheck_remote = qx/dig mx \@8.8.8.8 $domain +short/;
+		my $main_ip = qx/hostname -i/;
+		chomp($main_ip);
+                my @mxcheck_local  = qx/dig mx \@$main_ip $domain +short/;
+                my @mxcheck_remote = qx/dig mx \@8.8.8.8 $domain +short/;
 
-                if ( $mxcheck_local eq $mxcheck_remote ) {
-                    return;
+                if ( @mxcheck_local eq @mxcheck_remote ) {
+                    print_info("[INFO]  Remote and local MX lookups match\n");
+                
+		foreach (@mxcheck_local) {
+                    print_info(
+                        "\t\\_ Local MX: $domain IN MX $_");
                 }
+			print "\n";
+                 foreach (@mxcheck_remote) {
+                    print_info(
+                        "\t\\_ Remote MX: $domain IN MX $_");
+                   }
+}
+
                 else {
                     print_warning(
                         "[WARN] * Local MX does not match remote MX\n ");
+		foreach (@mxcheck_local) {
                     print_info(
-                        "\t\\_ Local MX: $domain IN MX $mxcheck_local\n");
+                        "\t\\_ Local MX: $domain IN MX $_");
+		}
+		print "\n";
+		 foreach (@mxcheck_remote) {
                     print_info(
-                        "\t\\_ Remote MX: $domain IN MX $mxcheck_remote\n");
+                        "\t\\_ Remote MX: $domain IN MX $_");
+		   }	
                 }
+
             }
 
         }
-    }
-
+}
 
