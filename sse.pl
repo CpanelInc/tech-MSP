@@ -621,16 +621,18 @@ sub email_valiases {
     opendir DIR, $dir or die "Cannot open $dir : $!\n";
     my @files = readdir DIR;
     foreach $file (@files) {
-        open FILE, "$dir/$file" or die "Cannot open $file : $!\n";
+        open FILE, "/etc/valiases/$file";
         while ( $lines = <FILE> ) {
             if ( $lines =~ /^$email/ ) {
                 if ( $lines =~ /\.\bautorespond/ ) {
                     print_warning(
-                        "[WARN] * Autoresponder found in $file : $lines");
+                        "[WARN] * Autoresponder found in /etc/valiases/$file\n");
+		 	   print_info("\t\t\\_$lines");
                 }
                 else {
                     print_warning(
-                        "[WARN] * Forwarder found in $file  :  $lines");
+                        "[WARN] * Forwarder found in $dir/$file\n");
+			print_info("\t\t\\_$lines");
                 }
             }
         }
@@ -689,8 +691,8 @@ sub email_valiases {
         }
 
         my $file = "$home/etc/$domain/quota";
-
-        open FILE, "$file";
+        
+	open FILE, "$file";
 
         while ( $lines = <FILE> ) {
             if ( $lines =~ m/$name/ ) {
