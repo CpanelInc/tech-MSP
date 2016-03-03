@@ -489,7 +489,7 @@ sub domain_resolv {
             my @dirs;
 
             while ( $dirs = <FILE> ) {
-                if ( $dirs =~ /(cwd=)(.+?)(\s)/i ) {
+                if (( $dirs =~ /(cwd=)(.+?)(\s)/i ) && ( $dirs !~ /(cwd=\/.+?exim)/i )  && ( $dirs !~ /(cwd=.+?CronDaemon)/i ) && ( $dirs !~ /(cwd=\/etc\/csf)/i ) && ( $dirs !~ /cwd=\/\s/i ) ) {
                     my $dir = $2;
                     push( @dirs, $dir );
                 }
