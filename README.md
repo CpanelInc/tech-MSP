@@ -20,7 +20,7 @@ Usage
 - Check if nobody user is prevented from sending mail.
 - Check server's PHP handler (PHP5 only at this time.)
 
-**[With --domain option]**
+**[With --domain or -d option]**
 
 - Check if domain exists on the server.
 - Check if the user account is suspended.
@@ -29,7 +29,7 @@ Usage
 - Check if domain resolves locally to server.
 - Check if domain has any virtual filters.
 
-**[With --email option]**
+**[With --email or -e option]**
 
 - Check if e-mail exists on server.
 - Check if e-mail has forwarders.
@@ -44,14 +44,3 @@ Usage
 
 - Check Main IP and IPs in /etc/ips for blacklistings
 
-**COMING SOON(ish):**
-
-*Next push should aim to have:*
-
-- *At LEAST* the e-mail option built in with, Iunno, one check?  Two maybe?
-- IPTables chex.
-
-*And then ...:*
-
-- IMPLIMENT COLORS (Readability).
-- Probably start trying to switch to IPC::Run instead of that gigantor and likely unneccesary run() sub I ganked from SSP.
