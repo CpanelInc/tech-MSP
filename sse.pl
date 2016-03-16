@@ -401,19 +401,19 @@ sub domain_resolv {
         }
 
         sub check_dkim {
-            my @check = qx/dig default._domainkey.$domain TXT/;
-            if (@check) {
-                foreach my $check (@check) {
-                    if ( $check =~ m/.*DKIM.*/ ) {
+             @check_dkim = qx/dig default._domainkey.$domain TXT +short/;
+            if (@check_dkim) {
+                foreach my $check_dkim(@check_dkim) {
                         print_info("[INFO] *");
                         print_normal(
                             " $domain has the following domain keys:\n ");
-                        print_normal("\t\\_ $check");
-                    }
+                        print_normal("\t\\_ $check_dkim");
+                    
                 }
-            }
+           } 
+
             else {
-                return;
+                print_warning("[WARN] * Domain does not have a DKIM record\n");
             }
         }
 
@@ -765,4 +765,3 @@ print_normal( "Mailbox Quota: Unlimited\n");
 
     }
 }
-
