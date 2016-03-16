@@ -695,19 +695,24 @@ sub email_valiases {
 	open FILE, "$file";
 
         while ( $lines = <FILE> ) {
-            if ( $lines =~ m/$name/ ) {
-                my @line        = split( /:/, $lines );
+            if ( $lines =~ m/^$name/ ) {
+                @line        = split( /:/, $lines );
                 my $quota_value = $line[1];
                 my $quota       = ( $quota_value / 1048576 );
                 print_info("[INFO] * ");
                 print_normal( "Mailbox Quota: " . $quota . " MB\n" );
             }
-            else {
-                print_info("[INFO] * ");
-                print_normal("Mailbox Quota: Unlimited\n");
-                return;
+            elsif ( $lines !~ m/^$name/ ) {
+                print "";
             }
-        }
+}
+
+my @unlimited =  grep ( !/\^$name/, @line);
+if (!@unlimited) {
+print_info("[INFO] * ");
+print_normal( "Mailbox Quota: Unlimited\n");
+}
+	
 
         sub check_closed_ports {
 
