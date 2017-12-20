@@ -408,9 +408,9 @@ sub domain_resolv {
                         print_normal(
                             " $domain has the following domain keys:\n ");
                         print_normal("\t\\_ $check_dkim");
-                    
+
                 }
-           } 
+           }
 
             else {
                 print_warning("[WARN] * Domain does not have a DKIM record\n");
@@ -661,23 +661,66 @@ sub email_valiases {
             print_warning("[WARN] * Exim is not running on port 25");
         }
     }
-
+    sub is_ea4 {
+        if ( -f '/etc/cpanel/ea4/is_ea4' ) {
+             return 1;
+        }
+        return;
+    }
     sub check_for_phphandler {
-        my $phpconf = '/usr/local/apache/conf/php.conf.yaml';
-        open my $phpconf_fh, '<', $phpconf;
-        while (<$phpconf_fh>) {
-            if (/^php5:[ \t]+['"]?([^'"]+)/) {
-                $php5handler = $1;
+        my $php = {};
+        my @current_php = split( /\n/, `/usr/local/cpanel/bin/rebuild_phpconf --current` );
+        if ( is_ea4 ) {
+            foreach my $line (@current_php) {
+                my $pkg;
+                if ( $line =~ m{ DEFAULT \s PHP: \s (\S+) }xms ) {
+                    $pkg                        = $1;
+                    $php->{$pkg}->{default_php} = 1;
+                    $php->{default}             = $pkg;
+                    next;
+                }
+                if ( $line =~ m{ (\S+) \s SAPI: \s (\S+) }xms ) {
+                    $pkg = $1;
+                    $php->{$pkg}->{handler} = $2;
+                    foreach ( split( /\n/, `scl enable $pkg 'php -v'` ) ) {
+                        if ( m{ PHP \s (\d+\.\S+) \s \(cli\) \s \(built: \s (\w+\s+\d+\s\d+\s\d+:\d+:\d+) }xms ) {
+                            $php->{$pkg}->{release_version} = $1;
+                            $php->{$pkg}->{build_time}      = $2;
+                            $php->{$pkg}->{build_time} =~ s/  / /;
+                        }
+                    }
+                }
             }
+            my $info;
+            my $cgi_handler = 0;
+            if ( defined($php) && defined( $php->{default} ) && defined( $php->{ $php->{default} }->{release_version} ) && defined( $php-> {$php->{default} }->{handler} ) ) {
+                $cgi_handler = 1 if $php->{ $php->{default} }->{handler} eq "cgi";
+                $info .= "[ EA4 ]";
+                $info .= " [ " . $php->{ $php->{default} }->{release_version} . " ( " . $php->{default} . " ) ]";
+                $info .= " [ " . $php->{ $php->{default} }->{handler} . " ]";
+            }
+            else {
+                $info .= "UNKNOWN";
+            }
+             print_normal('[INFO] * ' . $info . "\n");
         }
-        close $phpconf_fh;
-        chomp $php5handler;
-        if ( $php5handler eq "suphp" ) {
-            print_info("[INFO] * ");
-            print_normal("PHP5's handler is suPHP.\n");
+        else {
+            my $phpconf = '/usr/local/apache/conf/php.conf.yaml';
+            open my $phpconf_fh, '<', $phpconf;
+            while (<$phpconf_fh>) {
+                if (/^php5:[ \t]+['"]?([^'"]+)/) {
+                    $php5handler = $1;
+                }
+            }
+            close $phpconf_fh;
+            chomp $php5handler;
+            if ( $php5handler eq "suphp" ) {
+                print_info("[INFO] * ");
+                print_normal("PHP5's handler is suPHP.\n");
+            }
+            print_warning("[WARN] * PHP5's handler is $php5handler.\n")
+            if $php5handler ne "suphp";
         }
-        print_warning("[WARN] * PHP5's handler is $php5handler.\n")
-          if $php5handler ne "suphp";
     }
 
     sub email_quota {
@@ -691,7 +734,7 @@ sub email_valiases {
         }
 
         my $file = "$home/etc/$domain/quota";
-        
+
 	open FILE, "$file";
 
         while ( $lines = <FILE> ) {
@@ -712,7 +755,7 @@ if (!@unlimited) {
 print_info("[INFO] * ");
 print_normal( "Mailbox Quota: Unlimited\n");
 }
-	
+
 
         sub check_closed_ports {
 
