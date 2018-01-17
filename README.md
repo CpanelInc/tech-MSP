@@ -6,7 +6,7 @@ Exim email information utility for cPanel servers
 Usage
 --------------
 
-**# perl <(curl -s https://raw.githubusercontent.com/cPanelTechs/SSE/master/sse.pl) [options]**
+**# perl <(curl -s https://raw.githubusercontent.com/CpanelInc/tech-SSE/master/sse.pl) [options]**
 
 
 **Current Checks Impliemented:**
