@@ -335,6 +335,7 @@ sub domain_resolv {
             'zen.spamhaus.org'            => 'Spamhaus',
             'bl.spamcannibal.org'         => 'Spamcannibal',
             'ubl.unsubscore.com'          => 'LashBack',
+            'b.barracudacentral.org'      => 'Barracuda',
         );
 
         # Grab the mail addresses
