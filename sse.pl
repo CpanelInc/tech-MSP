@@ -114,7 +114,8 @@ sub help {
 "Without options:  Run informational checks on Exim's configuration and server status.\n",
 "--domain=DOMAIN   Check for domain's existence, ownership, and resolution on the server.\n",
       "--email=EMAIL     Email specific checks.\n",
-      "-s                View Breakdown of sent mail.\n";
+      "-s                View Breakdown of sent mail.\n",
+      "-b		 Checks the Main IP and IPs in /etc/ips for a few blacklists.\n";
 }
 
 sub run
