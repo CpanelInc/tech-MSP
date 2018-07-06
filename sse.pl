@@ -647,7 +647,7 @@ sub email_valiases {
         if ( $doc_root =~ m/DocumentRoot\s(\/.+?\/.+?\/)/ ) {
             print_warning(
                 "[WARN] * E-mail filter files exist for mailbox $email.\n")
-              if -e "$1\/etc\/$maildomain\/$user\/filter";
+              if -e -s "$1\/etc\/$maildomain\/$user\/filter";
         }
     }
 
