@@ -518,7 +518,11 @@ sub domain_resolv {
 
             print "\n";
             print "===================\n";
-            print "Total: " . scalar( @dirs - 1 );
+	    if  (@dirs < 1 ) {
+            print "Total: " . @dirs;
+            } else {
+            print "Total: " . scalar( @dirs - 1 ); 
+	    }
             print "\n===================\n";
 
             print_warning("\nTop 20 Email Titles:\n\n\n");
