@@ -89,6 +89,8 @@ sub print_help {
 }    
 
 sub main {
+print_help unless keys %opts;
+
     if (length $help) {
         print_help();
     }
