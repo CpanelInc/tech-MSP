@@ -32,10 +32,9 @@ our $AUTH_SENDMAIL_REGEX   = qr{\scwd=([^\s]+)\s};
 our $AUTH_LOCAL_USER_REGEX = qr{\sU=([^\s]+)\s.*B=authenticated_local_user};
 our $SUBJECT_REGEX         = qr{\s<=\s.*T="([^"]+)"\s};
 
+# Initialize
 our $LIMIT = 10;
 our $THRESHOLD = 1;
-
-# Initialize
 our @AUTH_PASSWORD_HITS;
 our @AUTH_SENDMAIL_HITS;
 our @AUTH_LOCAL_USER_HITS;
@@ -92,7 +91,7 @@ sub main {
         print_help();
     }
 
-    if (length $info) {
+    if (length $conf) {
         # Check Tweak Settings
         print_std("Checking Tweak Settings...");
         print "---------------------------------------\n";
