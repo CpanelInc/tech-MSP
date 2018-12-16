@@ -4,6 +4,8 @@ package SSE;
 use strict;
 use warnings;
 
+use Data::Dumper;
+
 use Getopt::Long;
 use Cpanel::AdvConfig::dovecot ();
 #use Cpanel::IONice            ();
@@ -163,16 +165,28 @@ sub main {
             return;
         }
         spam_check( $logdir );
-        print_info("Emails sent via Password Authentication");
-        sort_uniq(@AUTH_PASSWORD_HITS);
+        print BOLD WHITE ON_BLACK "Emails sent via Password Authentication:\n";
+        if (@AUTH_PASSWORD_HITS) {
+            sort_uniq(@AUTH_PASSWORD_HITS);
+        } else {
+            print "None\n";
+        }
         print "\n";
-        print_info("Directories where email was sent via sendmail/script");
-        sort_uniq(@AUTH_SENDMAIL_HITS);
+        print BOLD WHITE ON_BLACK "Directories where email was sent via sendmail/script:\n";
+        if (@AUTH_SENDMAIL_HITS) {
+            sort_uniq(@AUTH_SENDMAIL_HITS);
+        } else {
+            print "None\n";
+        }
         print "\n";
-        print_info("Users who sent mail via local SMTP");
-        sort_uniq(@AUTH_LOCAL_USER_HITS);
+        print BOLD WHITE ON_BLACK "Users who sent mail via local SMTP:\n";
+        if (@AUTH_LOCAL_USER_HITS) {
+            sort_uniq(@AUTH_LOCAL_USER_HITS);
+        } else {
+            print "None\n";
+        }
         print "\n";
-        print_info("Subjects by commonality");
+        print BOLD WHITE ON_BLACK "Subjects by commonality:\n";
         sort_uniq(@SUBJECT_HITS);
     }
     return;
