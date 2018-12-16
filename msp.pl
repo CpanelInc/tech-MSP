@@ -94,7 +94,7 @@ sub main {
     if (length $conf) {
         # Check Tweak Settings
         print_std("Checking Tweak Settings...");
-        print "---------------------------------------\n";
+        print "-----------------------------------\n";
         my %cpconf = get_conf( $CPANEL_CONFIG_FILE );
         if ( $cpconf{'smtpmailgidonly'} ne 1 ) {
             print_warn("Restrict outgoing SMTP to root, exim, and mailman (FKA SMTP Tweak) is disabled!"); 
@@ -141,7 +141,7 @@ sub main {
 
         # Check Dovecot Configuration
         print_std("Checking Dovecot Configuration...");
-        print "---------------------------------------\n";
+        print "------------------------------------------\n";
         my $dovecot = Cpanel::AdvConfig::dovecot::get_config();
         if ( $dovecot->{'protocols'} !~ m/imap/ ) {
             print_warn("IMAP Protocol is disabled!");
@@ -156,7 +156,7 @@ sub main {
 
     if (length $auth) {
         print_std("Checking Mail Authentication statistics...");
-        print "---------------------------------------\n";
+        print "---------------------------------------------------\n";
         $logdir //= $LOG_DIR;
         if (!-d $logdir) {
             print_warn("$logdir: No such file or directory. Skipping spam check...\n");
@@ -221,7 +221,7 @@ sub sort_uniq {
     foreach ( @input ) { $count{$_}++; }
     for ( sort { $count{$b} <=> $count{$a} } keys %count ) {
         if ( $line ne $limit ) {
-            printf ("%7 %s\n", "$count{$_}", "$_") if ( $count{$_} >= $threshold );
+            printf ("%7d %s\n", "$count{$_}", "$_") if ( $count{$_} >= $threshold );
             $line++;
         } else { 
             printf( "%7d %s\n", "$count{$_}", "$_") if ( $count{$_} >= $threshold );
