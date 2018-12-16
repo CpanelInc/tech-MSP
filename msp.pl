@@ -4,8 +4,6 @@ package SSE;
 use strict;
 use warnings;
 
-use Data::Dumper;
-
 use Getopt::Long;
 use Cpanel::AdvConfig::dovecot ();
 #use Cpanel::IONice            ();
@@ -34,6 +32,9 @@ our $AUTH_SENDMAIL_REGEX   = qr{\scwd=([^\s]+)\s};
 our $AUTH_LOCAL_USER_REGEX = qr{\sU=([^\s]+)\s.*B=authenticated_local_user};
 our $SUBJECT_REGEX         = qr{\s<=\s.*T="([^"]+)"\s};
 
+our $LIMIT = 10;
+our $THRESHOLD = 1;
+
 # Initialize
 our @AUTH_PASSWORD_HITS;
 our @AUTH_SENDMAIL_HITS;
@@ -42,18 +43,21 @@ our @SUBJECT_HITS;
 
 # Options
 my %opts;
-my ( $spam, $info, @rbl, $rotated, $rude, $forwards, $help, $logdir, $verbose );
+my ( $all, $auth, $forwards, $help, $info, $limit, $logdir, @rbl, $rotated, $rude, $threshold, $verbose );
 GetOptions(
     \%opts,
-    'help'         =>  \$help,
-    'logdir=s{1}'  =>  \$logdir,
-    'spam'         =>  \$spam,
-    'info'         =>  \$info,
-    'rbl=s{,}'     =>  \@rbl,
-    'rotated'      =>  \$rotated,
-    'rude'         =>  \$rude,
-    'forwards'     =>  \$forwards,
-    'verbose'      =>  \$verbose
+    'all'            =>  \$all,
+    'auth'           =>  \$auth,
+    'forwards'       =>  \$forwards,
+    'help'           =>  \$help,
+    'info'           =>  \$info,
+    'limit=i{1}'     =>  \$limit,
+    'logdir=s{1}'    =>  \$logdir,
+    'rbl=s{,}'       =>  \@rbl,
+    'rotated'        =>  \$rotated,
+    'rude'           =>  \$rude,
+    'threshold=i{1}' =>  \$threshold,
+    'verbose'        =>  \$verbose
 ) or die("Please see --help\n");
 
 # Make this a modulino
@@ -63,21 +67,21 @@ __PACKAGE__->main(@ARGV) unless caller();
 sub print_help {
     print BOLD BRIGHT_BLUE ON_BLACK "[MSP-$VERSION] ";
     print BOLD WHITE ON_BLACK "Mail Status Probe: Mail authentication statistics and configuration checker\n";
-    print "Usage: ./sse.pl --spam --rotated --rude --logdir /var/log/exim/\n";
-    print "       ./sse.pl --rbl [all|spamcop spamhaus]\n\n";
+    print "Usage: ./msp.pl --spam --rotated --rude --logdir /var/log/exim/\n";
+    print "       ./msp.pl --rbl [all|spamcop spamhaus]\n\n";
     printf( "\t%-15s %s\n", "--help", "print this help message");
     printf( "\t%-15s %s\n", "--all", "run all checks");
+    printf( "\t%-15s %s\n", "--auth", "print mail authentication statistics");
     printf( "\t%-15s %s\n", "--forwards", "print forward relay statistics");
     printf( "\t%-15s %s\n", "--ignore", "ignore common statistics (e.g. cwd=/var/spool/exim)");
     printf( "\t%-15s %s\n", "--info", "print mail configuration info (e.g. require_secure_auth, smtpmailgidonly, etc.)");
-    printf( "\t%-15s %s\n", "--limit", "limit statistics checks to n results");
-    printf( "\t%-15s %s\n", "--logdir", "specify an alternative logging directory, (/var/log/ is default)");
+    printf( "\t%-15s %s\n", "--limit", "limit statistics checks to n results (defaults to 10)");
+    printf( "\t%-15s %s\n", "--logdir", "specify an alternative logging directory, (defaults to /var/log)");
     printf( "\t%-15s %s\n", "--quiet", "only print alarming information or statistics (requires --threshold)");
     printf( "\t%-15s %s\n", "--rbl", "check IP's for blacklisting (default rbl:all, available: spamcop, spamhaus)");
     printf( "\t%-15s %s\n", "--rotated", "check rotated exim logs");
     printf( "\t%-15s %s\n", "--rude", "forgo nice/ionice settings");
-    printf( "\t%-15s %s\n", "--spam", "print outgoing mail authentication statistics");
-    printf( "\t%-15s %s\n", "--threshold", "limit statistics output to n threshold");
+    printf( "\t%-15s %s\n", "--threshold", "limit statistics output to n threshold(defaults to 1)");
     printf( "\t%-15s %s\n", "--verbose", "display all information");
     print "\n";
     exit;
@@ -151,7 +155,7 @@ sub main {
         print "\n";
     }
 
-    if (length $spam) {
+    if (length $auth) {
         print_std("Checking Mail Authentication statistics...");
         print "---------------------------------------\n";
         $logdir //= $LOG_DIR;
@@ -192,7 +196,7 @@ sub spam_check {
             }
         } else {
             if ( !open $fh, '<', $logdir . $log ) {
-                print_warn("Skipping $logdir/$log: Cannot open for readhing $!");
+                print_warn("Skipping $logdir/$log: Cannot open for reading $!");
                 next LOG;
             }
         }
@@ -211,14 +215,20 @@ sub spam_check {
 
 sub sort_uniq {
     my @input = @_;
-    my %sums;
-    my $last='';
-    %sums = map {
-        my $n;
-        do { $n = (($last=$_) ... ($last ne $_)) } while $n =~ /E0$/;
-        ($last => $n);
-    } sort @input;
-    print "$sums{$_}\t$_\n" foreach sort keys %sums;
+    my %count;
+    my $line = 1;
+    $limit //= $LIMIT;
+    $threshold //= $THRESHOLD;
+    foreach ( @input ) { $count{$_}++; }
+    for ( sort { $count{$b} <=> $count{$a} } keys %count ) {
+        if ( $line ne $limit ) {
+            printf ("%7 %s\n", "$count{$_}", "$_") if ( $count{$_} >= $threshold );
+            $line++;
+        } else { 
+            printf( "%7d %s\n", "$count{$_}", "$_") if ( $count{$_} >= $threshold );
+            last;
+        }
+    }
 }
 
 # cpanel.confg and exim.conf.localopts
