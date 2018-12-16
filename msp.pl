@@ -47,18 +47,18 @@ my %opts;
 my ( $all, $auth, $conf, $forwards, $help, $limit, $logdir, @rbl, $rotated, $rude, $threshold, $verbose );
 GetOptions(
     \%opts,
-    'all'            =>  \$all,
-    'auth'           =>  \$auth,
-    'forwards'       =>  \$forwards,
-    'help'           =>  \$help,
-    'conf'           =>  \$conf,
-    'limit=i{1}'     =>  \$limit,
-    'logdir=s{1}'    =>  \$logdir,
-    'rbl=s{,}'       =>  \@rbl,
-    'rotated'        =>  \$rotated,
-    'rude'           =>  \$rude,
-    'threshold=i{1}' =>  \$threshold,
-    'verbose'        =>  \$verbose
+    'all',
+    'auth',
+    'forwards',
+    'help',
+    'conf',
+    'limit=i{1}',
+    'logdir=s{1}',
+    'rbl=s{,}',
+    'rotated',
+    'rude',
+    'threshold=i{1}',
+    'verbose'
 ) or die("Please see --help\n");
 
 # Make this a modulino
@@ -76,7 +76,7 @@ sub print_help {
     printf( "\t%-15s %s\n", "--auth", "print mail authentication statistics");
     printf( "\t%-15s %s\n", "--forwards", "print forward relay statistics");
     printf( "\t%-15s %s\n", "--ignore", "ignore common statistics (e.g. cwd=/var/spool/exim)");
-    printf( "\t%-15s %s\n", "--limit", "limit statistics checks to n results (defaults to 10)");
+    printf( "\t%-15s %s\n", "--limit", "limit statistics checks to n results (defaults to 10, set to 0 for no limit)");
     printf( "\t%-15s %s\n", "--logdir", "specify an alternative logging directory, (defaults to /var/log)");
     printf( "\t%-15s %s\n", "--quiet", "only print alarming information or statistics (requires --threshold)");
     printf( "\t%-15s %s\n", "--rbl", "check IP's for blacklisting (default rbl:all, available: spamcop, spamhaus)");
@@ -89,35 +89,33 @@ sub print_help {
 }    
 
 sub main {
-print_help unless keys %opts;
-
-    if (length $help) {
+   if ( (!%opts) || ($opts{help} ) ) {
         print_help();
     }
 
-    if (length $conf) {
+    if ($opts{conf}) {
         # Check Tweak Settings
         print_std("Checking Tweak Settings...");
         print "-----------------------------------\n";
         my %cpconf = get_conf( $CPANEL_CONFIG_FILE );
         if ( $cpconf{'smtpmailgidonly'} ne 1 ) {
             print_warn("Restrict outgoing SMTP to root, exim, and mailman (FKA SMTP Tweak) is disabled!"); 
-        } elsif ( $verbose ) {
+        } elsif ( $opts{verbose} ) {
             print_info("Restrict outgoing SMTP to root, exim, and mailman (FKA SMTP Tweak) is enabled");
         }
         if ( $cpconf{'nobodyspam'} ne 1 ) {
             print_warn("Prevent “nobody” from sending mail is disabled!"); 
-        } elsif ( $verbose ) {
+        } elsif ( $opts{verbose} ) {
             print_info("Prevent “nobody” from sending mail is enabled");
         }
         if ( $cpconf{'popbeforesmtp'} ne 0 ) {
             print_warn("Pop-before-SMTP is enabled!"); 
-        } elsif ( $verbose ) {
+        } elsif ( $opts{verbose} ) {
             print_info("Pop-before-SMTP is disabled");
         }
         if ( $cpconf{'domainowner_mail_pass'} ne 0 ) {
             print_warn("Mail authentication via domain owner password is enabled!"); 
-        } elsif ( $verbose ) {
+        } elsif ( $opts{verbose} ) {
             print_info("Mail authentication via domain owner password is disabled");
         }
         print "\n";
@@ -128,17 +126,17 @@ print_help unless keys %opts;
         my %exim_localopts_conf = get_conf( $EXIM_LOCALOPTS_FILE );
         if ( $exim_localopts_conf{'allowweakciphers'} ne 0 ) {
             print_warn("Allow weak SSL/TLS ciphers is enabled!"); 
-        } elsif ( $verbose ) {
+        } elsif ( $opts{verbose} ) {
             print_info("Allow weak SSL/TLS ciphers is disabled");
         }   
         if ( $exim_localopts_conf{'require_secure_auth'} ne 1 ) {
             print_warn("Require clients to connect with SSL or issue the STARTTLS is disabled!"); 
-        } elsif ( $verbose ) {
+        } elsif ( $opts{verbose} ) {
             print_info("Require clients to connect with SSL or issue the STARTTLS is enabled");
         }
         if ( $exim_localopts_conf{'systemfilter'} ne q{/etc/cpanel_exim_system_filter} ) {
            print_warn("Custom System Filter File in use: $exim_localopts_conf{'systemfilter'}");
-        } elsif ( $verbose ) {
+        } elsif ( $opts{verbose} ) {
            print_info("System Filter File is set to the default path: $exim_localopts_conf{'systemfilter'}");
         }
         print "\n";
@@ -152,21 +150,21 @@ print_help unless keys %opts;
         }
         if ( $dovecot->{'disable_plaintext_auth'} !~ m/no/ ) {
             print_warn("Allow Plaintext Authentication is enabled!");
-        } elsif ( $verbose ) {
+        } elsif ( $opts{verbose} ) {
             print_info("Allow Plaintext Authentication is disabled");
         }
         print "\n";
     }
 
-    if (length $auth) {
+    if ($opts{auth}) {
         print_std("Checking Mail Authentication statistics...");
         print "---------------------------------------------------\n";
-        $logdir //= $LOG_DIR;
-        if (!-d $logdir) {
-            print_warn("$logdir: No such file or directory. Skipping spam check...\n");
+        $opts{logdir} //= $LOG_DIR;
+        if (!-d $opts{logdir}) {
+            print_warn("$opts{logdir}: No such file or directory. Skipping spam check...\n");
             return;
         }
-        spam_check( $logdir );
+        spam_check( $opts{logdir} );
         print BOLD WHITE ON_BLACK "Emails sent via Password Authentication:\n";
         if (@AUTH_PASSWORD_HITS) {
             sort_uniq(@AUTH_PASSWORD_HITS);
@@ -198,7 +196,7 @@ sub spam_check {
     my $logdir = shift;
     my @logfiles;
     for my $file ( grep { m/^exim_mainlog/ } @{ Cpanel::FileUtils::Dir::get_directory_nodes($logdir) } ) {
-        push @logfiles, $file if ( ( $rotated ) && ( $file =~ m/mainlog-/ ) );
+        push @logfiles, $file if ( ( $opts{rotated} ) && ( $file =~ m/mainlog-/ ) );
         push @logfiles, $file if ( $file =~ m/mainlog$/ );
     }
     my $fh;
@@ -232,15 +230,15 @@ sub sort_uniq {
     my @input = @_;
     my %count;
     my $line = 1;
-    $limit //= $LIMIT;
-    $threshold //= $THRESHOLD;
+    $opts{limit} //= $LIMIT;
+    $opts{threshold} //= $THRESHOLD;
     foreach ( @input ) { $count{$_}++; }
     for ( sort { $count{$b} <=> $count{$a} } keys %count ) {
-        if ( $line ne $limit ) {
-            printf ("%7d %s\n", "$count{$_}", "$_") if ( $count{$_} >= $threshold );
+        if ( $line ne $opts{limit} ) {
+            printf ("%7d %s\n", "$count{$_}", "$_") if ( $count{$_} >= $opts{threshold} );
             $line++;
         } else { 
-            printf( "%7d %s\n", "$count{$_}", "$_") if ( $count{$_} >= $threshold );
+            printf( "%7d %s\n", "$count{$_}", "$_") if ( $count{$_} >= $opts{threshold} );
             last;
         }
     }
