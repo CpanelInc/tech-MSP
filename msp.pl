@@ -37,7 +37,7 @@ our $SUBJECT_REGEX         = qr{\s<=\s.*T="([^"]+)"\s};
 # Initialize
 our $LIMIT = 10;
 our $THRESHOLD = 1;
-our $ROTATED_LIMIT = 4; # I've seen users with hundreds of rotated logs before, we should safeguard to prevent msp from working against unreasonably large data set
+our $ROTATED_LIMIT = 5; # I've seen users with hundreds of rotated logs before, we should safeguard to prevent msp from working against unreasonably large data set
 our @AUTH_PASSWORD_HITS;
 our @AUTH_SENDMAIL_HITS;
 our @AUTH_LOCAL_USER_HITS;
