@@ -37,6 +37,7 @@ our $SUBJECT_REGEX         = qr{\s<=\s.*T="([^"]+)"\s};
 # Initialize
 our $LIMIT = 10;
 our $THRESHOLD = 1;
+our $ROTATED_LIMIT = 4; # I've seen users with hundreds of rotated logs before, we should safeguard to prevent msp from working against unreasonably large data set
 our @AUTH_PASSWORD_HITS;
 our @AUTH_SENDMAIL_HITS;
 our @AUTH_LOCAL_USER_HITS;
@@ -195,12 +196,19 @@ sub main {
 sub auth_check {
     my $logdir = shift;
     my @logfiles;
+    my $logcount = 0;
     for my $file ( grep { m/^exim_mainlog/ } @{ Cpanel::FileUtils::Dir::get_directory_nodes($logdir) } ) {
-        push @logfiles, $file if ( ( $opts{rotated} ) && ( $file =~ m/mainlog-/ ) );
+        if ( $opts{rotated} ) { 
+            if ( ( $file =~ m/mainlog-/ ) && ( $logcount ne $ROTATED_LIMIT ) ) {
+                push @logfiles, $file;
+                $logcount++;
+            }
+        }
         push @logfiles, $file if ( $file =~ m/mainlog$/ );
     }
+    print_warn("Safeguard triggered... --rotated is limited to $ROTATED_LIMIT logs");
     my $fh;
-    LOG: for my $log ( @logfiles ) {
+    lOG: for my $log ( @logfiles ) {
         if ( $log =~ /[.]gz$/ ) {
             my @cmd = ( qw{ gunzip -c -f }, $logdir . $log );
             if ( !open $fh, '-|', @cmd ) {
