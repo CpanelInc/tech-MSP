@@ -164,7 +164,7 @@ sub main {
             print_warn("$opts{logdir}: No such file or directory. Skipping spam check...\n");
             return;
         }
-        spam_check( $opts{logdir} );
+        auth_check( $opts{logdir} );
         print BOLD WHITE ON_BLACK "Emails sent via Password Authentication:\n";
         if (@AUTH_PASSWORD_HITS) {
             sort_uniq(@AUTH_PASSWORD_HITS);
@@ -192,7 +192,7 @@ sub main {
     return;
 }
 
-sub spam_check {
+sub auth_check {
     my $logdir = shift;
     my @logfiles;
     for my $file ( grep { m/^exim_mainlog/ } @{ Cpanel::FileUtils::Dir::get_directory_nodes($logdir) } ) {
