@@ -8,7 +8,7 @@ use Data::Dumper;
 
 use Getopt::Long;
 use Cpanel::AdvConfig::dovecot ();
-#use Cpanel::IONice            ();
+use Cpanel::IONice            ();
 #use Cpanel::IP::Loopback      ();
 use Cpanel::FileUtils::Dir     ();
 #use Cpanel::Locale            ();
@@ -207,6 +207,11 @@ sub auth_check {
         push @logfiles, $file if ( $file =~ m/mainlog$/ );
     }
     print_warn("Safeguard triggered... --rotated is limited to $ROTATED_LIMIT logs");
+    my %cpconf = get_conf( $CPANEL_CONFIG_FILE );
+    if ( ( !$opts{rude} ) && ( Cpanel::IONice::ionice( 'best-effort', exists $cpconf{'ionice_import_exim_data'} ? $cpconf{'ionice_import_exim_data'} : 6 ) ) ) {
+        print_warn("Setting I/O priority to reduce system load: " . Cpanel::IONice::get_ionice() . "\n");
+        setpriority( 0, 0, 19 );
+    }
     my $fh;
     lOG: for my $log ( @logfiles ) {
         if ( $log =~ /[.]gz$/ ) {
