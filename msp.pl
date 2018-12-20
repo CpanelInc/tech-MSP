@@ -72,14 +72,14 @@ sub print_help {
     print "Usage: ./msp.pl --spam --rotated --rude --logdir /var/log/exim/\n";
     print "       ./msp.pl --rbl [all|spamcop spamhaus]\n\n";
     printf( "\t%-15s %s\n", "--help", "print this help message");
-    printf( "\t%-15s %s\n", "--all", "run all checks");
-    printf( "\t%-15s %s\n", "--conf", "print mail configuration info (e.g. require_secure_auth, smtpmailgidonly, etc.)");
+#    printf( "\t%-15s %s\n", "--all", "run all checks");
     printf( "\t%-15s %s\n", "--auth", "print mail authentication statistics");
-    printf( "\t%-15s %s\n", "--forwards", "print forward relay statistics");
-    printf( "\t%-15s %s\n", "--ignore", "ignore common statistics (e.g. cwd=/var/spool/exim)");
+    printf( "\t%-15s %s\n", "--conf", "print mail configuration info (e.g. require_secure_auth, smtpmailgidonly, etc.)");
+#    printf( "\t%-15s %s\n", "--forwards", "print forward relay statistics");
+#    printf( "\t%-15s %s\n", "--ignore", "ignore common statistics (e.g. cwd=/var/spool/exim)");
     printf( "\t%-15s %s\n", "--limit", "limit statistics checks to n results (defaults to 10, set to 0 for no limit)");
     printf( "\t%-15s %s\n", "--logdir", "specify an alternative logging directory, (defaults to /var/log)");
-    printf( "\t%-15s %s\n", "--quiet", "only print alarming information or statistics (requires --threshold)");
+#    printf( "\t%-15s %s\n", "--quiet", "only print alarming information or statistics (requires --threshold)");
     printf( "\t%-15s %s\n", "--rbl", "check IP's for blacklisting (default rbl:all, available: spamcop, spamhaus)");
     printf( "\t%-15s %s\n", "--rotated", "check rotated exim logs");
     printf( "\t%-15s %s\n", "--rude", "forgo nice/ionice settings");
@@ -93,7 +93,6 @@ sub main {
    if ( (!%opts) || ($opts{help} ) ) {
         print_help();
     }
-
     if ($opts{conf}) {
         # Check Tweak Settings
         print_std("Checking Tweak Settings...");
