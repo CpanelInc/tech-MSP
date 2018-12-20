@@ -206,7 +206,7 @@ sub auth_check {
         }
         push @logfiles, $file if ( $file =~ m/mainlog$/ );
     }
-    print_warn("Safeguard triggered... --rotated is limited to $ROTATED_LIMIT logs");
+    print_warn("Safeguard triggered... --rotated is limited to $ROTATED_LIMIT logs") if ( $logcount eq $ROTATED_LIMIT );
     my %cpconf = get_conf( $CPANEL_CONFIG_FILE );
     if ( ( !$opts{rude} ) && ( Cpanel::IONice::ionice( 'best-effort', exists $cpconf{'ionice_import_exim_data'} ? $cpconf{'ionice_import_exim_data'} : 6 ) ) ) {
         print_warn("Setting I/O priority to reduce system load: " . Cpanel::IONice::get_ionice() . "\n");
