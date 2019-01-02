@@ -160,6 +160,7 @@ sub main {
         print_std("Checking Mail Authentication statistics...");
         print "---------------------------------------------------\n";
         $opts{logdir} //= $LOG_DIR;
+        $opts{logdir} =~ s@/*$@/@;
         if (!-d $opts{logdir}) {
             print_warn("$opts{logdir}: No such file or directory. Skipping spam check...\n");
             return;
