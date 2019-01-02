@@ -7,22 +7,19 @@ use warnings;
 use Data::Dumper;
 
 use Getopt::Long;
-use Cpanel::AdvConfig::dovecot ();
-use Cpanel::IONice            ();
-#use Cpanel::IP::Loopback      ();
-use Cpanel::FileUtils::Dir     ();
-#use Cpanel::Locale            ();
-#use Cpanel::Sys::Load         ();
-#use Cpanel::TailWatch         ();    # PPI USE OK - inline below
-use Cpanel::IO                 ();
-#use Try::Tiny                 ();
-use Term::ANSIColor            qw{:constants};
-
-$Term::ANSIColor::AUTORESET = 1;
+use Cpanel::AdvConfig::dovecot                      ();
+use Cpanel::DnsRoots::Resolver                      ();
+use Cpanel::FileUtils::Dir                          ();
+use Cpanel::IONice                                  ();
+use Cpanel::IO                                      ();
+use Cpanel::NAT                qw{:get_all_public_ips};
+use Term::ANSIColor                     qw{:constants};
 
 our $VERSION = '1.9';
 
 # Variables
+$Term::ANSIColor::AUTORESET = 1;
+
 our $LOG_DIR               = q{/var/log/};
 our $CPANEL_CONFIG_FILE    = q{/var/cpanel/cpanel.config};
 our $EXIM_LOCALOPTS_FILE   = q{/etc/exim.conf.localopts};
@@ -33,6 +30,8 @@ our $AUTH_PASSWORD_REGEX   = qr{\sA=dovecot_login:([^\s]+)\s};
 our $AUTH_SENDMAIL_REGEX   = qr{\scwd=([^\s]+)\s};
 our $AUTH_LOCAL_USER_REGEX = qr{\sU=([^\s]+)\s.*B=authenticated_local_user};
 our $SUBJECT_REGEX         = qr{\s<=\s.*T="([^"]+)"\s};
+
+our @RBLS                  = qw{ bl.spamcop.net zen.spamhaus.org };
 
 # Initialize
 our $LIMIT = 10;
@@ -55,7 +54,7 @@ GetOptions(
     'conf',
     'limit=i{1}',
     'logdir=s{1}',
-    'rbl=s{,}',
+    'rbl=s',
     'rotated',
     'rude',
     'threshold=i{1}',
@@ -80,7 +79,7 @@ sub print_help {
     printf( "\t%-15s %s\n", "--limit", "limit statistics checks to n results (defaults to 10, set to 0 for no limit)");
     printf( "\t%-15s %s\n", "--logdir", "specify an alternative logging directory, (defaults to /var/log)");
 #    printf( "\t%-15s %s\n", "--quiet", "only print alarming information or statistics (requires --threshold)");
-    printf( "\t%-15s %s\n", "--rbl", "check IP's for blacklisting (default rbl:all, available: spamcop, spamhaus)");
+    printf( "\t%-15s %s\n", "--rbl", "check IP's for blacklisting (all, bl.spamcop.net, zen.spamhaus.org)");
     printf( "\t%-15s %s\n", "--rotated", "check rotated exim logs");
     printf( "\t%-15s %s\n", "--rude", "forgo nice/ionice settings");
     printf( "\t%-15s %s\n", "--threshold", "limit statistics output to n threshold(defaults to 1)");
@@ -90,7 +89,7 @@ sub print_help {
 }    
 
 sub main {
-   if ( (!%opts) || ($opts{help} ) ) {
+   if ( (!%opts) || ($opts{help}) ) {
         print_help();
     }
     if ($opts{conf}) {
@@ -189,6 +188,12 @@ sub main {
         print "\n";
         print BOLD WHITE ON_BLACK "Subjects by commonality:\n";
         sort_uniq(@SUBJECT_HITS);
+        print "\n";
+    }
+
+    if ($opts{rbl}) {
+        @rbl = split( /,/, $opts{rbl});
+        rbl_check(@rbl);
     }
     return;
 }
@@ -237,6 +242,26 @@ sub auth_check {
         close($fh);
     }
      return;
+}
+
+sub rbl_check {
+    my @rbls = @_;
+    my $ips = Cpanel::NAT::get_all_public_ips;
+    @rbls = @RBLS if (grep /\ball\b/, @rbls);
+    print_std("Checking IP's against RBL's...");
+    print "---------------------------------------\n";
+    foreach my $ip (@$ips) {
+        print "$ip:\n";
+        my $ip_rev = join('.', reverse split('\.', $ip));
+        foreach my $rbl (@rbls) {
+            my $res = Cpanel::DnsRoots::Resolver->new();
+            if (grep { /127.0.0.2/ } $res->recursive_query( "$ip_rev" . '.' . "$rbl", 'A')) {
+                 printf("\t%-15s: LISTED\n", $rbl);
+            } else {
+                 printf("\t%-15s: Not Found\n", $rbl);
+            }
+        }
+    }
 }
 
 sub sort_uniq {
