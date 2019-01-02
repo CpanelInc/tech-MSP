@@ -69,8 +69,8 @@ __PACKAGE__->main(@ARGV) unless caller();
 sub print_help {
     print BOLD BRIGHT_BLUE ON_BLACK "[MSP-$VERSION] ";
     print BOLD WHITE ON_BLACK "Mail Status Probe: Mail authentication statistics and configuration checker\n";
-    print "Usage: ./msp.pl --spam --rotated --rude --logdir /var/log/exim/\n";
-    print "       ./msp.pl --rbl [all|spamcop spamhaus]\n\n";
+    print "Usage: ./msp.pl --auth --rotated --rude\n";
+    print "       ./msp.pl --conf --rbl [all|spamcop spamhaus]\n\n";
     printf( "\t%-15s %s\n", "--help", "print this help message");
 #    printf( "\t%-15s %s\n", "--all", "run all checks");
     printf( "\t%-15s %s\n", "--auth", "print mail authentication statistics");
