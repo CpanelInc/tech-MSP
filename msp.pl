@@ -285,6 +285,7 @@ sub rbl_check {
                  print_bold_green('GOOD');
             }
         }
+        print "\n";
     }
 }
 
