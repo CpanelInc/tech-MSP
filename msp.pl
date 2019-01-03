@@ -76,21 +76,21 @@ sub print_help {
     print BOLD BRIGHT_BLUE ON_BLACK "[MSP-$VERSION] ";
     print BOLD WHITE ON_BLACK "Mail Status Probe: Mail authentication statistics and configuration checker\n";
     print "Usage: ./msp.pl --auth --rotated --rude\n";
-    print "       ./msp.pl --conf --rbl [all|spamcop spamhaus]\n\n";
-    printf( "\t%-15s %s\n", "--help", "print this help message");
+    print "       ./msp.pl --conf --rbl [all|bl.spamcop.net,zen.spamhaus.org]\n\n";
+    printf( "\t%-15s %s\n",  "--help", "print this help message");
 #    printf( "\t%-15s %s\n", "--all", "run all checks");
-    printf( "\t%-15s %s\n", "--auth", "print mail authentication statistics");
-    printf( "\t%-15s %s\n", "--conf", "print mail configuration info (e.g. require_secure_auth, smtpmailgidonly, etc.)");
+    printf( "\t%-15s %s\n",  "--auth", "print mail authentication statistics");
+    printf( "\t%-15s %s\n",  "--conf", "print mail configuration info (e.g. require_secure_auth, smtpmailgidonly, etc.)");
 #    printf( "\t%-15s %s\n", "--forwards", "print forward relay statistics");
 #    printf( "\t%-15s %s\n", "--ignore", "ignore common statistics (e.g. cwd=/var/spool/exim)");
-    printf( "\t%-15s %s\n", "--limit", "limit statistics checks to n results (defaults to 10, set to 0 for no limit)");
-    printf( "\t%-15s %s\n", "--logdir", "specify an alternative logging directory, (defaults to /var/log)");
+    printf( "\t%-15s %s\n",  "--limit", "limit statistics checks to n results (defaults to 10, set to 0 for no limit)");
+    printf( "\t%-15s %s\n",  "--logdir", "specify an alternative logging directory, (defaults to /var/log)");
 #    printf( "\t%-15s %s\n", "--quiet", "only print alarming information or statistics (requires --threshold)");
-    printf( "\t%-15s %s\n", "--rbl", "check IP's for blacklisting (all, bl.spamcop.net, zen.spamhaus.org)");
-    printf( "\t%-15s %s\n", "--rotated", "check rotated exim logs");
-    printf( "\t%-15s %s\n", "--rude", "forgo nice/ionice settings");
-    printf( "\t%-15s %s\n", "--threshold", "limit statistics output to n threshold(defaults to 1)");
-    printf( "\t%-15s %s\n", "--verbose", "display all information");
+    printf( "\t%-15s %s\n",  "--rbl", "check IP's against provided blacklists(comma delimited)");
+    printf( "\t%-15s %s\n",  "--rotated", "check rotated exim logs");
+    printf( "\t%-15s %s\n",  "--rude", "forgo nice/ionice settings");
+    printf( "\t%-15s %s\n",  "--threshold", "limit statistics output to n threshold(defaults to 1)");
+    printf( "\t%-15s %s\n",  "--verbose", "display all information");
     print "\n";
     exit;
 }    
@@ -221,7 +221,7 @@ sub auth_check {
     print_warn("Safeguard triggered... --rotated is limited to $ROTATED_LIMIT logs") if ( $logcount eq $ROTATED_LIMIT );
     my %cpconf = get_conf( $CPANEL_CONFIG_FILE );
     if ( ( !$opts{rude} ) && ( Cpanel::IONice::ionice( 'best-effort', exists $cpconf{'ionice_import_exim_data'} ? $cpconf{'ionice_import_exim_data'} : 6 ) ) ) {
-        print_warn("Setting I/O priority to reduce system load: " . Cpanel::IONice::get_ionice() . "\n");
+        print("Setting I/O priority to reduce system load: " . Cpanel::IONice::get_ionice() . "\n\n");
         setpriority( 0, 0, 19 );
     }
     my $fh;
