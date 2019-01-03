@@ -32,7 +32,13 @@ our $AUTH_SENDMAIL_REGEX   = qr{\scwd=([^\s]+)\s};
 our $AUTH_LOCAL_USER_REGEX = qr{\sU=([^\s]+)\s.*B=authenticated_local_user};
 our $SUBJECT_REGEX         = qr{\s<=\s.*T="([^"]+)"\s};
 
-our @RBLS                  = qw{ bl.spamcop.net zen.spamhaus.org };
+our @RBLS                  = qw{ b.barracudacentral.org
+                                 bl.spamcop.net
+                                 dnsbl.sorbs.net
+                                 spam.dnsbl.sorbs.net
+                                 ips.backscatterer.org
+                                 zen.spamhaus.org
+                               };
 
 # Initialize
 our $LIMIT = 10;
@@ -255,8 +261,11 @@ sub rbl_check {
     foreach my $iphash ( @{$ipref} ) {
         push @ips, Cpanel::NAT::get_public_ip( $iphash->{'ip'} );
     }
+    # Uncomment the following for testing positive hits
+    # push @ips, qw { 127.0.0.2 };
 
     # If "all" is found in the --rbl arg, ignore rest, use default rbl list
+    # maybe we should append so that user can specify all and ones which are not included in the list?
     @rbls = @RBLS if (grep /\ball\b/i, @rbls);
 
     print_std("Checking IP's against RBL's...");
@@ -269,10 +278,10 @@ sub rbl_check {
             # Do we need to call this on each lookup or can we move this outside the loop?
             my $res = Cpanel::DnsRoots::Resolver->new();
             if (grep { /127.0.0.2/ } $res->recursive_query( "$ip_rev" . '.' . "$rbl", 'A')) {
-                 printf("\t%-20s ", $rbl);
+                 printf("\t%-25s ", $rbl);
                  print_bold_red('LISTED');
             } else {
-                 printf("\t%-20s ", $rbl);
+                 printf("\t%-25s ", $rbl);
                  print_bold_green('GOOD');
             }
         }
