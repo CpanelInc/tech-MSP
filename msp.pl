@@ -337,4 +337,26 @@ sub print_std {
     return;
 }
 
+sub print_bold_white {
+    my $text = shift // '';
+    return if $text eq '';
 
+    print BOLD WHITE ON_BLACK "$text\n";
+    return;
+}
+
+sub print_bold_red {
+    my $text = shift // '';
+    return if $text eq '';
+
+    print BOLD RED ON_BLACK "$text\n";
+    return;
+}
+
+sub print_bold_green {
+    my $text = shift // '';
+    return if $text eq '';
+
+    print BOLD GREEN ON_BLACK "$text\n";
+    return;
+}
