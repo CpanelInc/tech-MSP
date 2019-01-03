@@ -1,7 +1,7 @@
 # MSP - Mail Status Probe
 ## MSP is currently a commandline function that provides basic information about the cPanel mail server.
-#### This project was formmaly known under SSE; however, SSE is now confused with Server-Sevent Events. As the project has been rewritten from scratch, the name SSE has been repurposed, and to avoid breakage(sse.pl is still included but not maintained), the name MSP has been taken.
-=====
+##### This project was formmaly known under SSE; however, SSE is now confused with Server-Sevent Events. As the project has been rewritten from scratch, the name SSE has been repurposed, and to avoid breakage(sse.pl is still included but not maintained), the name MSP has been taken.
+-------------
 ```
 # /usr/local/cpanel/3rdparty/bin/perl <(curl -s "https://raw.githubusercontent.com/CpanelInc/tech-SSE/master/msp.pl") --help
 [MSP-2.0] Mail Status Probe: Mail authentication statistics and configuration checker
@@ -35,8 +35,8 @@ The `--rbllist` simply prints the available hardcoded RBL's which are triggered 
 
 The `--rbl` flag requires comma delimited input. If a preferred RBL is not in the hardcoded list, you can simply pass the DNSRBL(s) here.
 
-=====
-## Begin legacy sse.pl readme
+------------
+## Begin legacy sse.pl README:
 SSE
 ================
 
