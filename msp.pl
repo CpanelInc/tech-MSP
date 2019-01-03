@@ -51,7 +51,7 @@ our @SUBJECT_HITS;
 
 # Options
 my %opts;
-my ( $all, $auth, $conf, $forwards, $help, $limit, $logdir, @rbl, $rotated, $rude, $threshold, $verbose );
+my ( $all, $auth, $conf, $forwards, $help, $limit, $logdir, @rbl, $rbllist, $rotated, $rude, $threshold, $verbose );
 GetOptions(
     \%opts,
     'all',
@@ -62,6 +62,7 @@ GetOptions(
     'limit=i{1}',
     'logdir=s{1}',
     'rbl=s',
+    'rbllist',
     'rotated',
     'rude',
     'threshold=i{1}',
@@ -87,6 +88,7 @@ sub print_help {
     printf( "\t%-15s %s\n",  "--logdir", "specify an alternative logging directory, (defaults to /var/log)");
 #    printf( "\t%-15s %s\n", "--quiet", "only print alarming information or statistics (requires --threshold)");
     printf( "\t%-15s %s\n",  "--rbl", "check IP's against provided blacklists(comma delimited)");
+    printf( "\t%-15s %s\n",  "--rbllist", "list available RBL's");
     printf( "\t%-15s %s\n",  "--rotated", "check rotated exim logs");
     printf( "\t%-15s %s\n",  "--rude", "forgo nice/ionice settings");
     printf( "\t%-15s %s\n",  "--threshold", "limit statistics output to n threshold(defaults to 1)");
@@ -198,6 +200,10 @@ sub main {
         print "\n";
     }
 
+    if ($opts{rbllist}) {
+        rbl_list();
+    }
+
     if ($opts{rbl}) {
         @rbl = split( /,/, $opts{rbl});
         rbl_check(@rbl);
@@ -287,6 +293,16 @@ sub rbl_check {
         }
         print "\n";
     }
+}
+
+sub rbl_list {
+    print_bold_white("Available RBL's:");
+    print "----------------\n";
+
+    foreach my $rbl (@RBLS) {
+        print "$rbl\n";
+    }
+    print "\n";
 }
 
 sub sort_uniq {
