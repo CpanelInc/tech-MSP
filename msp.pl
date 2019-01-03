@@ -1,10 +1,8 @@
 #!/usr/local/cpanel/3rdparty/bin/perl
-package SSE;
+package MSP;
 
 use strict;
 use warnings;
-
-use Data::Dumper;
 
 use Getopt::Long;
 use Cpanel::AdvConfig::dovecot                      ();
@@ -16,9 +14,9 @@ use Cpanel::NAT                qw{:get_all_public_ips};
 use Whostmgr::Ips                                   ();  
 use Term::ANSIColor                     qw{:constants};
 
-our $VERSION = '1.9';
-
 # Variables
+our $VERSION = '2.0';
+
 $Term::ANSIColor::AUTORESET = 1;
 
 our $LOG_DIR               = q{/var/log/};
@@ -272,8 +270,7 @@ sub rbl_check {
 
     # If "all" is found in the --rbl arg, ignore rest, use default rbl list
     # maybe we should append so that user can specify all and ones which are not included in the list?
-    @rbls = @RBLS if (grep /\ball\b/i, @rbls);
-
+    @rbls = @RBLS if (grep { /\ball\b/i } @rbls);
     print_bold_white("Checking IP's against RBL's...");
     print "------------------------------\n";
 
@@ -293,6 +290,7 @@ sub rbl_check {
         }
         print "\n";
     }
+    return;
 }
 
 sub rbl_list {
@@ -303,6 +301,7 @@ sub rbl_list {
         print "$rbl\n";
     }
     print "\n";
+    return;
 }
 
 sub sort_uniq {
@@ -321,6 +320,7 @@ sub sort_uniq {
             last;
         }
     }
+    return;
 }
 
 # cpanel.confg and exim.conf.localopts
@@ -335,6 +335,7 @@ sub get_conf {
     } else {
         print_warn("Could not open file: $conf");
     }
+    return;
 }
 
 # pretty prints

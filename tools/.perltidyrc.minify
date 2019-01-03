@@ -1,0 +1,16 @@
+-l=400
+-i=0
+-naws
+-bar
+-nolq
+-nolc
+-nola
+-nokw
+-kbl=0
+-mbl=0
+-dac
+-nwls='+ - * / = == =>'
+-nwrs='+ - * / = == =>'
+--format-skipping
+--format-skipping-begin='#\s*minifytidyoff'
+--format-skipping-end='#\s*minifytidyon'
