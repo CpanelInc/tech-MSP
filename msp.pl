@@ -101,8 +101,8 @@ sub main {
     }
     if ($opts{conf}) {
         # Check Tweak Settings
-        print_std("Checking Tweak Settings...");
-        print "-----------------------------------\n";
+        print_bold_white("Checking Tweak Settings...");
+        print "--------------------------\n";
         my %cpconf = get_conf( $CPANEL_CONFIG_FILE );
         if ( $cpconf{'smtpmailgidonly'} ne 1 ) {
             print_warn("Restrict outgoing SMTP to root, exim, and mailman (FKA SMTP Tweak) is disabled!"); 
@@ -127,8 +127,8 @@ sub main {
         print "\n";
 
         # Check Exim Configuration
-        print_std("Checking Exim Configuration...");
-        print "---------------------------------------\n";
+        print_bold_white("Checking Exim Configuration...");
+        print "------------------------------\n";
         my %exim_localopts_conf = get_conf( $EXIM_LOCALOPTS_FILE );
         if ( $exim_localopts_conf{'allowweakciphers'} ne 0 ) {
             print_warn("Allow weak SSL/TLS ciphers is enabled!"); 
@@ -148,8 +148,8 @@ sub main {
         print "\n";
 
         # Check Dovecot Configuration
-        print_std("Checking Dovecot Configuration...");
-        print "------------------------------------------\n";
+        print_bold_white("Checking Dovecot Configuration...");
+        print "---------------------------------\n";
         my $dovecot = Cpanel::AdvConfig::dovecot::get_config();
         if ( $dovecot->{'protocols'} !~ m/imap/ ) {
             print_warn("IMAP Protocol is disabled!");
@@ -163,8 +163,8 @@ sub main {
     }
 
     if ($opts{auth}) {
-        print_std("Checking Mail Authentication statistics...");
-        print "---------------------------------------------------\n";
+        print_bold_white("Checking Mail Authentication statistics...");
+        print "------------------------------------------\n";
         $opts{logdir} //= $LOG_DIR;
         $opts{logdir} =~ s@/*$@/@;
         if (!-d $opts{logdir}) {
@@ -268,8 +268,8 @@ sub rbl_check {
     # maybe we should append so that user can specify all and ones which are not included in the list?
     @rbls = @RBLS if (grep /\ball\b/i, @rbls);
 
-    print_std("Checking IP's against RBL's...");
-    print "---------------------------------------\n";
+    print_bold_white("Checking IP's against RBL's...");
+    print "------------------------------\n";
 
     foreach my $ip (@ips) {
         print "$ip:\n";
