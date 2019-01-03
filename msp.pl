@@ -269,9 +269,11 @@ sub rbl_check {
             # Do we need to call this on each lookup or can we move this outside the loop?
             my $res = Cpanel::DnsRoots::Resolver->new();
             if (grep { /127.0.0.2/ } $res->recursive_query( "$ip_rev" . '.' . "$rbl", 'A')) {
-                 printf("\t%-15s: LISTED\n", $rbl);
+                 printf("\t%-20s ", $rbl);
+                 print_bold_red('LISTED');
             } else {
-                 printf("\t%-15s: Not Found\n", $rbl);
+                 printf("\t%-20s ", $rbl);
+                 print_bold_green('GOOD');
             }
         }
     }
