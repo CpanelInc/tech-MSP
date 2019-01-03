@@ -13,6 +13,7 @@ use Cpanel::FileUtils::Dir                          ();
 use Cpanel::IONice                                  ();
 use Cpanel::IO                                      ();
 use Cpanel::NAT                qw{:get_all_public_ips};
+use Whostmgr::Ips                                   ();  
 use Term::ANSIColor                     qw{:constants};
 
 our $VERSION = '1.9';
@@ -246,14 +247,26 @@ sub auth_check {
 
 sub rbl_check {
     my @rbls = @_;
-    my $ips = Cpanel::NAT::get_all_public_ips;
-    @rbls = @RBLS if (grep /\ball\b/, @rbls);
+    my @ips;
+
+    # Fetch IP's... should we only check mailips? this is more thorough...
+    # could ignore local through bogon regex?
+    my $ipref = Whostmgr::Ips::get_detailed_ip_cfg();
+    foreach my $iphash ( @{$ipref} ) {
+        push @ips, Cpanel::NAT::get_public_ip( $iphash->{'ip'} );
+    }
+
+    # If "all" is found in the --rbl arg, ignore rest, use default rbl list
+    @rbls = @RBLS if (grep /\ball\b/i, @rbls);
+
     print_std("Checking IP's against RBL's...");
     print "---------------------------------------\n";
-    foreach my $ip (@$ips) {
+
+    foreach my $ip (@ips) {
         print "$ip:\n";
         my $ip_rev = join('.', reverse split('\.', $ip));
         foreach my $rbl (@rbls) {
+            # Do we need to call this on each lookup or can we move this outside the loop?
             my $res = Cpanel::DnsRoots::Resolver->new();
             if (grep { /127.0.0.2/ } $res->recursive_query( "$ip_rev" . '.' . "$rbl", 'A')) {
                  printf("\t%-15s: LISTED\n", $rbl);
