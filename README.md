@@ -2,7 +2,7 @@
 ## MSP is currently a commandline function that provides basic information about the cPanel mail server.
 ###### This project was formmaly known under SSE; however, SSE is now confused with Server-Sent Events. As the project has been rewritten from scratch, the name SSE has been repurposed, and to avoid breakage(sse.pl is still included but not maintained), the name MSP has been taken.
 -------------
-![--help](https://user-images.githubusercontent.com/25645218/50690925-d87cb880-0ff4-11e9-844e-a586e79018ab.png)
+![--help](https://user-images.githubusercontent.com/25645218/50696777-09b1b480-1006-11e9-9469-21c1cbb0b2f0.png)
 ### --auth
 ![--auth](https://user-images.githubusercontent.com/25645218/50690982-ff3aef00-0ff4-11e9-9f87-8647fac8608c.png)
 The `--auth` argument is useful for checking for sources of spam. It aggregates authentication statistics from pasword authentication, local SMTP(authenticated_local_user), and via sendmail. As well, it provides a list of the most common subjects. By default, the check is performed with nice/ionice to ensure the server is not overloaded by the scan; however, this can be overridden with `--rude`.
