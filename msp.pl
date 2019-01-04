@@ -90,29 +90,19 @@ sub print_help {
 }    
 
 sub main {
-   if ( (!%opts) || ($opts{help}) ) {
-        print_help();
-    }
-    if ($opts{conf}) {
-        conf_check();
-    }
+    die "MSP must be run as root\n" if ( $< != 0 );
 
-    if ($opts{queue}) {
-        print_exim_queue();
-    }
+    print_help() if ( (!%opts) || ($opts{help}) );
 
-    if ($opts{auth}) {
-        auth_check();
-    }
+    conf_check() if ($opts{conf});
 
-    if ($opts{rbllist}) {
-        rbl_list();
-    }
+    print_exim_queue() if ($opts{queue});
 
-    if ($opts{rbl}) {
-        @rbl = split( /,/, $opts{rbl});
-        rbl_check(@rbl);
-    }
+    auth_check() if ($opts{auth});
+
+    rbl_list() if ($opts{rbllist});
+
+    rbl_check($opts{rbl}) if ($opts{rbl});
     return;
 }
 
@@ -301,7 +291,8 @@ sub get_exim_queue {
     }
 
 sub rbl_check {
-    my @rbls = @_;
+    my $rbls = shift;
+    my @rbls = split( /,/, $rbls);
     my @ips;
 
     # Fetch IP's... should we only check mailips? this is more thorough...
