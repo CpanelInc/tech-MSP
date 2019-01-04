@@ -94,6 +94,29 @@ sub main {
         print_help();
     }
     if ($opts{conf}) {
+        conf_check();
+    }
+
+    if ($opts{queue}) {
+        print_exim_queue();
+    }
+
+    if ($opts{auth}) {
+        auth_check();
+    }
+
+    if ($opts{rbllist}) {
+        rbl_list();
+    }
+
+    if ($opts{rbl}) {
+        @rbl = split( /,/, $opts{rbl});
+        rbl_check(@rbl);
+    }
+    return;
+}
+
+sub conf_check {
         # Check Tweak Settings
         print_bold_white("Checking Tweak Settings...\n");
         print "--------------------------\n";
@@ -154,26 +177,9 @@ sub main {
             print_info("Allow Plaintext Authentication is disabled\n");
         }
         print "\n";
-    }
-
-    if ($opts{queue}) {
-        print_exim_queue();
-    }
-
-    if ($opts{auth}) {
-        auth_check();
-    }
-
-    if ($opts{rbllist}) {
-        rbl_list();
-    }
-
-    if ($opts{rbl}) {
-        @rbl = split( /,/, $opts{rbl});
-        rbl_check(@rbl);
-    }
-    return;
+        return;
 }
+   
 
 sub auth_check {
     my @logfiles;
