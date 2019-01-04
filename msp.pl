@@ -42,6 +42,7 @@ our @RBLS                  = qw{ b.barracudacentral.org
 our $LIMIT = 10;
 our $THRESHOLD = 1;
 our $ROTATED_LIMIT = 5; # I've seen users with hundreds of rotated logs before, we should safeguard to prevent msp from working against unreasonably large data set
+our $OPT_TIMEOUT;
 our @AUTH_PASSWORD_HITS;
 our @AUTH_SENDMAIL_HITS;
 our @AUTH_LOCAL_USER_HITS;
@@ -336,6 +337,59 @@ sub get_conf {
         print_warn("Could not open file: $conf");
     }
     return;
+}
+
+# exec utilities, taken from SSP
+sub timed_run_trap_stderr {
+    my ( $timer, @PROGA ) = @_;
+    return _timedsaferun( $timer, 1, @PROGA );
+}
+
+sub _timedsaferun {    # Borrowed from WHM 66 Cpanel::SafeRun::Timed and modified
+                       # We need to be sure to never return undef, return an empty string instead.
+    my ( $timer, $stderr_to_stdout, @PROGA ) = @_;
+    return '' if ( substr( $PROGA[0], 0, 1 ) eq '/' && !-x $PROGA[0] );
+    $timer = $timer       ? $timer       : 25;       # A timer value of 0 means use the default, currently 25.
+    $timer = $OPT_TIMEOUT ? $OPT_TIMEOUT : $timer;
+
+    my $output;
+    my $complete = 0;
+    my $pid;
+    my $fh;                                          # FB-63723: must declare $fh before eval block in order to avoid unwanted implicit waitpid on die
+    eval {
+        local $SIG{'__DIE__'} = 'DEFAULT';
+        local $SIG{'ALRM'} = sub { $output = ''; print RED ON_BLACK 'Timeout while executing: ' . join( ' ', @PROGA ) . "\n"; die; };
+        alarm($timer);
+        if ( $pid = open( $fh, '-|' ) ) {            ## no critic (BriefOpen)
+            local $/;
+            $output = readline($fh);
+            close($fh);
+        }
+        elsif ( defined $pid ) {
+            open( STDIN, '<', '/dev/null' );         ## no critic (BriefOpen)
+            if ($stderr_to_stdout) {
+                open( STDERR, '>&', 'STDOUT' );      ## no critic (BriefOpen)
+            }
+            else {
+                open( STDERR, '>', '/dev/null' );    ## no critic (BriefOpen)
+            }
+            exec(@PROGA) or exit 1;
+        }
+        else {
+            print RED ON_BLACK 'Error while executing: [ ' . join( ' ', @PROGA ) . ' ]: ' . $! . "\n";
+            alarm 0;
+            die;
+        }
+        $complete = 1;
+        alarm 0;
+    };
+    alarm 0;
+    if ( !$complete && $pid && $pid > 0 ) {
+        kill( 15, $pid );    #TERM
+        sleep(2);            # Give the process a chance to die 'nicely'
+        kill( 9, $pid );     #KILL
+    }
+    return defined $output ? $output : '';
 }
 
 # pretty prints
