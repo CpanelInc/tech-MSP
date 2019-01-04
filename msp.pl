@@ -93,63 +93,63 @@ sub main {
     }
     if ($opts{conf}) {
         # Check Tweak Settings
-        print_bold_white("Checking Tweak Settings...");
+        print_bold_white("Checking Tweak Settings...\n");
         print "--------------------------\n";
         my %cpconf = get_conf( $CPANEL_CONFIG_FILE );
         if ( $cpconf{'smtpmailgidonly'} ne 1 ) {
-            print_warn("Restrict outgoing SMTP to root, exim, and mailman (FKA SMTP Tweak) is disabled!"); 
+            print_warn("Restrict outgoing SMTP to root, exim, and mailman (FKA SMTP Tweak) is disabled!\n"); 
         } elsif ( $opts{verbose} ) {
-            print_info("Restrict outgoing SMTP to root, exim, and mailman (FKA SMTP Tweak) is enabled");
+            print_info("Restrict outgoing SMTP to root, exim, and mailman (FKA SMTP Tweak) is enabled\n");
         }
         if ( $cpconf{'nobodyspam'} ne 1 ) {
-            print_warn("Prevent “nobody” from sending mail is disabled!"); 
+            print_warn("Prevent “nobody” from sending mail is disabled!\n"); 
         } elsif ( $opts{verbose} ) {
-            print_info("Prevent “nobody” from sending mail is enabled");
+            print_info("Prevent “nobody” from sending mail is enabled\n");
         }
         if ( $cpconf{'popbeforesmtp'} ne 0 ) {
-            print_warn("Pop-before-SMTP is enabled!"); 
+            print_warn("Pop-before-SMTP is enabled!\n"); 
         } elsif ( $opts{verbose} ) {
-            print_info("Pop-before-SMTP is disabled");
+            print_info("Pop-before-SMTP is disabled\n");
         }
         if ( $cpconf{'domainowner_mail_pass'} ne 0 ) {
-            print_warn("Mail authentication via domain owner password is enabled!"); 
+            print_warn("Mail authentication via domain owner password is enabled!\n"); 
         } elsif ( $opts{verbose} ) {
-            print_info("Mail authentication via domain owner password is disabled");
+            print_info("Mail authentication via domain owner password is disabled\n");
         }
         print "\n";
 
         # Check Exim Configuration
-        print_bold_white("Checking Exim Configuration...");
+        print_bold_white("Checking Exim Configuration...\n");
         print "------------------------------\n";
         my %exim_localopts_conf = get_conf( $EXIM_LOCALOPTS_FILE );
         if ( $exim_localopts_conf{'allowweakciphers'} ne 0 ) {
-            print_warn("Allow weak SSL/TLS ciphers is enabled!"); 
+            print_warn("Allow weak SSL/TLS ciphers is enabled!\n"); 
         } elsif ( $opts{verbose} ) {
-            print_info("Allow weak SSL/TLS ciphers is disabled");
+            print_info("Allow weak SSL/TLS ciphers is disabled\n");
         }   
         if ( $exim_localopts_conf{'require_secure_auth'} ne 1 ) {
-            print_warn("Require clients to connect with SSL or issue the STARTTLS is disabled!"); 
+            print_warn("Require clients to connect with SSL or issue the STARTTLS is disabled!\n"); 
         } elsif ( $opts{verbose} ) {
-            print_info("Require clients to connect with SSL or issue the STARTTLS is enabled");
+            print_info("Require clients to connect with SSL or issue the STARTTLS is enabled\n");
         }
         if ( $exim_localopts_conf{'systemfilter'} ne q{/etc/cpanel_exim_system_filter} ) {
-           print_warn("Custom System Filter File in use: $exim_localopts_conf{'systemfilter'}");
+           print_warn("Custom System Filter File in use: $exim_localopts_conf{'systemfilter'}\n");
         } elsif ( $opts{verbose} ) {
-           print_info("System Filter File is set to the default path: $exim_localopts_conf{'systemfilter'}");
+           print_info("System Filter File is set to the default path: $exim_localopts_conf{'systemfilter'}\n");
         }
         print "\n";
 
         # Check Dovecot Configuration
-        print_bold_white("Checking Dovecot Configuration...");
+        print_bold_white("Checking Dovecot Configuration...\n");
         print "---------------------------------\n";
         my $dovecot = Cpanel::AdvConfig::dovecot::get_config();
         if ( $dovecot->{'protocols'} !~ m/imap/ ) {
-            print_warn("IMAP Protocol is disabled!");
+            print_warn("IMAP Protocol is disabled!\n");
         }
         if ( $dovecot->{'disable_plaintext_auth'} !~ m/no/ ) {
-            print_warn("Allow Plaintext Authentication is enabled!");
+            print_warn("Allow Plaintext Authentication is enabled!\n");
         } elsif ( $opts{verbose} ) {
-            print_info("Allow Plaintext Authentication is disabled");
+            print_info("Allow Plaintext Authentication is disabled\n");
         }
         print "\n";
     }
@@ -183,7 +183,7 @@ sub auth_check {
     my $auth_local_user_regex = qr{\sU=([^\s]+)\s.*B=authenticated_local_user};
     my $subject_regex         = qr{\s<=\s.*T="([^"]+)"\s};
 
-    print_bold_white("Checking Mail Authentication statistics...");
+    print_bold_white("Checking Mail Authentication statistics...\n");
     print "------------------------------------------\n";
 
     # Set logdir, ensure trailing slash, and bail if the provided logdir doesn't exist:
@@ -191,7 +191,7 @@ sub auth_check {
     $logdir =~ s@/*$@/@;
 
     if (!-d $logdir) {
-        print_warn("$opts{logdir}: No such file or directory. Skipping spam check...\n");
+        print_warn("$opts{logdir}: No such file or directory. Skipping spam check...\n\n");
         return;
     }
  
@@ -205,10 +205,10 @@ sub auth_check {
         }
         push @logfiles, $file if ( $file =~ m/mainlog$/ );
     }
-    print_warn("Safeguard triggered... --rotated is limited to $ROTATED_LIMIT logs") if ( $logcount eq $ROTATED_LIMIT );
+    print_warn("Safeguard triggered... --rotated is limited to $ROTATED_LIMIT logs\n") if ( $logcount eq $ROTATED_LIMIT );
 
     # Bail if we can't find any logs
-    return print_warn("Bailing, no exim logs found...\n") if (!@logfiles);
+    return print_warn("Bailing, no exim logs found...\n\n") if (!@logfiles);
 
     # Set ionice
     my %cpconf = get_conf( $CPANEL_CONFIG_FILE );
@@ -222,12 +222,12 @@ sub auth_check {
         if ( $log =~ /[.]gz$/ ) {
             my @cmd = ( qw{ gunzip -c -f }, $logdir . $log );
             if ( !open $fh, '-|', @cmd ) {
-                print_warn("Skipping $logdir/$log: Cannot open pipe to read stdout from command '@{ [ join ' ', @cmd ] }' : $!");
+                print_warn("Skipping $logdir/$log: Cannot open pipe to read stdout from command '@{ [ join ' ', @cmd ] }' : $!\n");
                 next LOG;
             }
         } else {
             if ( !open $fh, '<', $logdir . $log ) {
-                print_warn("Skipping $logdir/$log: Cannot open for reading $!");
+                print_warn("Skipping $logdir/$log: Cannot open for reading $!\n");
                 next LOG;
             }
         }
@@ -243,33 +243,37 @@ sub auth_check {
     }
 
     # Print info
-    print_bold_white("Emails sent via Password Authentication:");
+    print_bold_white("Emails sent via Password Authentication:\n");
     if (@auth_password_hits) {
         sort_uniq(@auth_password_hits);
     } else {
         print "None\n";
     }
     print "\n";
-    print_bold_white("Directories where email was sent via sendmail/script:");
+    print_bold_white("Directories where email was sent via sendmail/script:\n");
     if (@auth_sendmail_hits) {
         sort_uniq(@auth_sendmail_hits);
     } else {
         print "None\n";
     }
     print "\n";
-    print_bold_white("Users who sent mail via local SMTP:");
+    print_bold_white("Users who sent mail via local SMTP:\n");
     if (@auth_local_user_hits) {
         sort_uniq(@auth_local_user_hits);
     } else {
         print "None\n";
     }
     print "\n";
-    print_bold_white("Subjects by commonality:");
+    print_bold_white("Subjects by commonality:\n");
     sort_uniq(@subject_hits);
     print "\n";
  
     return;
 }
+
+sub get_exim_queue {
+    return timed_run_trap_stderr( 10, 'exim', '-bpc');
+    }
 
 sub rbl_check {
     my @rbls = @_;
@@ -287,7 +291,7 @@ sub rbl_check {
     # If "all" is found in the --rbl arg, ignore rest, use default rbl list
     # maybe we should append so that user can specify all and ones which are not included in the list?
     @rbls = @RBLS if (grep { /\ball\b/i } @rbls);
-    print_bold_white("Checking IP's against RBL's...");
+    print_bold_white("Checking IP's against RBL's...\n");
     print "------------------------------\n";
 
     foreach my $ip (@ips) {
@@ -298,10 +302,10 @@ sub rbl_check {
             my $res = Cpanel::DnsRoots::Resolver->new();
             if (grep { /127.0.0.2/ } $res->recursive_query( "$ip_rev" . '.' . "$rbl", 'A')) {
                  printf("\t%-25s ", $rbl);
-                 print_bold_red('LISTED');
+                 print_bold_red("LISTED\n");
             } else {
                  printf("\t%-25s ", $rbl);
-                 print_bold_green('GOOD');
+                 print_bold_green("GOOD\n");
             }
         }
         print "\n";
@@ -310,7 +314,7 @@ sub rbl_check {
 }
 
 sub rbl_list {
-    print_bold_white("Available RBL's:");
+    print_bold_white("Available RBL's:\n");
     print "----------------\n";
 
     foreach my $rbl (@RBLS) {
@@ -349,7 +353,7 @@ sub get_conf {
         close $cpconf_fh;
         return %cpconf;
     } else {
-        print_warn("Could not open file: $conf");
+        print_warn("Could not open file: $conf\n");
     }
     return;
 }
@@ -413,7 +417,7 @@ sub print_warn {
     return if $text eq '';
 
     print BOLD RED ON_BLACK '[WARN] * ';
-    print WHITE ON_BLACK "$text\n";
+    print WHITE ON_BLACK "$text";
     return;
 }
 
@@ -422,7 +426,7 @@ sub print_info {
     return if $text eq '';
 
     print BOLD GREEN ON_BLACK '[INFO] * ';
-    print WHITE ON_BLACK "$text\n";
+    print WHITE ON_BLACK "$text";
     return;
 }
 
@@ -431,7 +435,7 @@ sub print_std {
     return if $text eq '';
 
     print BOLD BRIGHT_BLUE ON_BLACK '[MSP]  * ';
-    print BOLD WHITE ON_BLACK "$text\n";
+    print BOLD WHITE ON_BLACK "$text";
     return;
 }
 
@@ -439,7 +443,7 @@ sub print_bold_white {
     my $text = shift // '';
     return if $text eq '';
 
-    print BOLD WHITE ON_BLACK "$text\n";
+    print BOLD WHITE ON_BLACK "$text";
     return;
 }
 
@@ -447,7 +451,7 @@ sub print_bold_red {
     my $text = shift // '';
     return if $text eq '';
 
-    print BOLD RED ON_BLACK "$text\n";
+    print BOLD RED ON_BLACK "$text";
     return;
 }
 
@@ -455,6 +459,6 @@ sub print_bold_green {
     my $text = shift // '';
     return if $text eq '';
 
-    print BOLD GREEN ON_BLACK "$text\n";
+    print BOLD GREEN ON_BLACK "$text";
     return;
 }
