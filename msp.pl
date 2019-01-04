@@ -41,7 +41,7 @@ our $OPT_TIMEOUT;
 
 # Options
 my %opts;
-my ( $all, $auth, $conf, $forwards, $help, $limit, $logdir, @rbl, $rbllist, $rotated, $rude, $threshold, $verbose );
+my ( $all, $auth, $conf, $forwards, $help, $limit, $logdir, $queue, @rbl, $rbllist, $rotated, $rude, $threshold, $verbose );
 GetOptions(
     \%opts,
     'all',
@@ -51,6 +51,7 @@ GetOptions(
     'conf',
     'limit=i{1}',
     'logdir=s{1}',
+    'queue',
     'rbl=s',
     'rbllist',
     'rotated',
@@ -76,6 +77,7 @@ sub print_help {
 #    printf( "\t%-15s %s\n", "--ignore", "ignore common statistics (e.g. cwd=/var/spool/exim)");
     printf( "\t%-15s %s\n",  "--limit", "limit statistics checks to n results (defaults to 10, set to 0 for no limit)");
     printf( "\t%-15s %s\n",  "--logdir", "specify an alternative logging directory, (defaults to /var/log)");
+    printf( "\t%-15s %s\n",  "--queue", "print exim queue length");
 #    printf( "\t%-15s %s\n", "--quiet", "only print alarming information or statistics (requires --threshold)");
     printf( "\t%-15s %s\n",  "--rbl", "check IP's against provided blacklists(comma delimited)");
     printf( "\t%-15s %s\n",  "--rbllist", "list available RBL's");
@@ -152,6 +154,10 @@ sub main {
             print_info("Allow Plaintext Authentication is disabled\n");
         }
         print "\n";
+    }
+
+    if ($opts{queue}) {
+        print_exim_queue();
     }
 
     if ($opts{auth}) {
@@ -271,8 +277,21 @@ sub auth_check {
     return;
 }
 
+sub print_exim_queue {
+    # Print exim queue length
+    print_bold_white("Exim Queue: ");
+    my $queue = get_exim_queue();
+    if ($queue >= 1000) {
+        print_bold_red("$queue\n");
+    } else {
+        print_bold_green("$queue\n");
+    }
+    return;
+}
+
 sub get_exim_queue {
-    return timed_run_trap_stderr( 10, 'exim', '-bpc');
+    my $queue = timed_run_trap_stderr( 10, 'exim', '-bpc');
+    return $queue;
     }
 
 sub rbl_check {
