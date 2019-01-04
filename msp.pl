@@ -19,17 +19,12 @@ our $VERSION = '2.0';
 
 $Term::ANSIColor::AUTORESET = 1;
 
-our $LOG_DIR               = q{/var/log/};
+our $LOGDIR               = q{/var/log/};
 our $CPANEL_CONFIG_FILE    = q{/var/cpanel/cpanel.config};
 our $EXIM_LOCALOPTS_FILE   = q{/etc/exim.conf.localopts};
 our $DOVECOT_CONF          = q{/var/cpanel/conf/dovecot/main};
 
 our $EXIM_MAINLOG          = q{exim_mainlog};
-our $AUTH_PASSWORD_REGEX   = qr{\sA=dovecot_login:([^\s]+)\s};
-our $AUTH_SENDMAIL_REGEX   = qr{\scwd=([^\s]+)\s};
-our $AUTH_LOCAL_USER_REGEX = qr{\sU=([^\s]+)\s.*B=authenticated_local_user};
-our $SUBJECT_REGEX         = qr{\s<=\s.*T="([^"]+)"\s};
-
 our @RBLS                  = qw{ b.barracudacentral.org
                                  bl.spamcop.net
                                  dnsbl.sorbs.net
@@ -43,10 +38,6 @@ our $LIMIT = 10;
 our $THRESHOLD = 1;
 our $ROTATED_LIMIT = 5; # I've seen users with hundreds of rotated logs before, we should safeguard to prevent msp from working against unreasonably large data set
 our $OPT_TIMEOUT;
-our @AUTH_PASSWORD_HITS;
-our @AUTH_SENDMAIL_HITS;
-our @AUTH_LOCAL_USER_HITS;
-our @SUBJECT_HITS;
 
 # Options
 my %opts;
@@ -164,39 +155,7 @@ sub main {
     }
 
     if ($opts{auth}) {
-        print_bold_white("Checking Mail Authentication statistics...");
-        print "------------------------------------------\n";
-        $opts{logdir} //= $LOG_DIR;
-        $opts{logdir} =~ s@/*$@/@;
-        if (!-d $opts{logdir}) {
-            print_warn("$opts{logdir}: No such file or directory. Skipping spam check...\n");
-            return;
-        }
-        auth_check( $opts{logdir} );
-        print BOLD WHITE ON_BLACK "Emails sent via Password Authentication:\n";
-        if (@AUTH_PASSWORD_HITS) {
-            sort_uniq(@AUTH_PASSWORD_HITS);
-        } else {
-            print "None\n";
-        }
-        print "\n";
-        print BOLD WHITE ON_BLACK "Directories where email was sent via sendmail/script:\n";
-        if (@AUTH_SENDMAIL_HITS) {
-            sort_uniq(@AUTH_SENDMAIL_HITS);
-        } else {
-            print "None\n";
-        }
-        print "\n";
-        print BOLD WHITE ON_BLACK "Users who sent mail via local SMTP:\n";
-        if (@AUTH_LOCAL_USER_HITS) {
-            sort_uniq(@AUTH_LOCAL_USER_HITS);
-        } else {
-            print "None\n";
-        }
-        print "\n";
-        print BOLD WHITE ON_BLACK "Subjects by commonality:\n";
-        sort_uniq(@SUBJECT_HITS);
-        print "\n";
+        auth_check();
     }
 
     if ($opts{rbllist}) {
@@ -211,9 +170,32 @@ sub main {
 }
 
 sub auth_check {
-    my $logdir = shift;
     my @logfiles;
+    my @auth_password_hits;
+    my @auth_sendmail_hits;
+    my @auth_local_user_hits;
+    my @subject_hits;
     my $logcount = 0;
+
+    # Exim regex search strings
+    my $auth_password_regex   = qr{\sA=dovecot_login:([^\s]+)\s};
+    my $auth_sendmail_regex   = qr{\scwd=([^\s]+)\s};
+    my $auth_local_user_regex = qr{\sU=([^\s]+)\s.*B=authenticated_local_user};
+    my $subject_regex         = qr{\s<=\s.*T="([^"]+)"\s};
+
+    print_bold_white("Checking Mail Authentication statistics...");
+    print "------------------------------------------\n";
+
+    # Set logdir, ensure trailing slash, and bail if the provided logdir doesn't exist:
+    my $logdir = ($opts{logdir}) ? ($opts{logdir}) : $LOGDIR;
+    $logdir =~ s@/*$@/@;
+
+    if (!-d $logdir) {
+        print_warn("$opts{logdir}: No such file or directory. Skipping spam check...\n");
+        return;
+    }
+ 
+    # Collect log files
     for my $file ( grep { m/^exim_mainlog/ } @{ Cpanel::FileUtils::Dir::get_directory_nodes($logdir) } ) {
         if ( $opts{rotated} ) { 
             if ( ( $file =~ m/mainlog-/ ) && ( $logcount ne $ROTATED_LIMIT ) ) {
@@ -224,11 +206,17 @@ sub auth_check {
         push @logfiles, $file if ( $file =~ m/mainlog$/ );
     }
     print_warn("Safeguard triggered... --rotated is limited to $ROTATED_LIMIT logs") if ( $logcount eq $ROTATED_LIMIT );
+
+    # Bail if we can't find any logs
+    return print_warn("Bailing, no exim logs found...\n") if (!@logfiles);
+
+    # Set ionice
     my %cpconf = get_conf( $CPANEL_CONFIG_FILE );
     if ( ( !$opts{rude} ) && ( Cpanel::IONice::ionice( 'best-effort', exists $cpconf{'ionice_import_exim_data'} ? $cpconf{'ionice_import_exim_data'} : 6 ) ) ) {
         print("Setting I/O priority to reduce system load: " . Cpanel::IONice::get_ionice() . "\n\n");
         setpriority( 0, 0, 19 );
     }
+
     my $fh;
     lOG: for my $log ( @logfiles ) {
         if ( $log =~ /[.]gz$/ ) {
@@ -245,15 +233,42 @@ sub auth_check {
         }
         while ( my $block = Cpanel::IO::read_bytes_to_end_of_line( $fh, 65_535 ) ) {
             foreach my $line ( split( m{\n}, $block ) ) {
-                push @AUTH_PASSWORD_HITS, $1 if ($line =~ $AUTH_PASSWORD_REGEX);
-                push @AUTH_SENDMAIL_HITS, $1 if ($line =~ $AUTH_SENDMAIL_REGEX);
-                push @AUTH_LOCAL_USER_HITS, $1 if ($line =~ $AUTH_LOCAL_USER_REGEX);
-                push @SUBJECT_HITS, $1 if ($line =~ $SUBJECT_REGEX);
+                push @auth_password_hits, $1 if ($line =~ $auth_password_regex);
+                push @auth_sendmail_hits, $1 if ($line =~ $auth_sendmail_regex);
+                push @auth_local_user_hits, $1 if ($line =~ $auth_local_user_regex);
+                push @subject_hits, $1 if ($line =~ $subject_regex);
             }
         }
         close($fh);
     }
-     return;
+
+    # Print info
+    print_bold_white("Emails sent via Password Authentication:");
+    if (@auth_password_hits) {
+        sort_uniq(@auth_password_hits);
+    } else {
+        print "None\n";
+    }
+    print "\n";
+    print_bold_white("Directories where email was sent via sendmail/script:");
+    if (@auth_sendmail_hits) {
+        sort_uniq(@auth_sendmail_hits);
+    } else {
+        print "None\n";
+    }
+    print "\n";
+    print_bold_white("Users who sent mail via local SMTP:");
+    if (@auth_local_user_hits) {
+        sort_uniq(@auth_local_user_hits);
+    } else {
+        print "None\n";
+    }
+    print "\n";
+    print_bold_white("Subjects by commonality:");
+    sort_uniq(@subject_hits);
+    print "\n";
+ 
+    return;
 }
 
 sub rbl_check {
