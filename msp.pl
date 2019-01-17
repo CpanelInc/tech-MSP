@@ -6,11 +6,17 @@ use warnings;
 
 use Getopt::Long;
 use Cpanel::AdvConfig::dovecot                      ();
+use Cpanel::Config                                  ();
+use Cpanel::ConfigFiles                             ();
+use Cpanel::Config::LoadConfig                      ();
 use Cpanel::DnsRoots::Resolver                      ();
+use Cpanel::DnsRoots                                ();
+use Cpanel::Exception                               ();
 use Cpanel::FileUtils::Dir                          ();
 use Cpanel::IONice                                  ();
 use Cpanel::IO                                      ();
 use Cpanel::NAT                qw{:get_all_public_ips};
+use Try::Tiny                                       ();
 use Whostmgr::Ips                                   ();  
 use Term::ANSIColor                     qw{:constants};
 
@@ -165,6 +171,38 @@ sub conf_check {
             print_warn("Allow Plaintext Authentication is enabled!\n");
         } elsif ( $opts{verbose} ) {
             print_info("Allow Plaintext Authentication is disabled\n");
+        }
+        print "\n";
+
+        # Check whether local/remote domains are actually local/remote
+        print_bold_white("Checking domain resolution...\n");
+        print "---------------------------------\n";
+        print "Domain's configured to be local:\n";
+        my $local_hr = Cpanel::Config::loadlocaldomains;
+
+        foreach my $key (keys %$local_hr) {
+            my $res = Cpanel::DnsRoots->new();
+            my ($failure, $metadata) = $res->_get_local_domain_resolution($key);
+            if ( (!$failure && $verbose) ) {
+                printf("\t%-25s ", $key);
+                print_bold_green("local\n");
+            } elsif ($failure) {
+                printf("\t%-25s ", $key);
+                print_bold_red("$failure\n");
+            }
+        }
+        print "\n";
+        print "Domains configured to be remote:\n";
+        my $remote_ref = Cpanel::Config::LoadConfig::loadConfig( $Cpanel::ConfigFiles::REMOTEDOMAINS_FILE, {}, '' );
+        foreach my $key (keys %$remote_ref) {
+            my $res = Cpanel::DnsRoots->new();
+            my ($failure, $metadata) = $res->_get_local_domain_resolution($key);
+            if ( ($failure && $verbose) ) {
+                printf("\t%-25s ", $key);
+                print_bold_green("$failure\n");
+            } elsif (!$failure) {
+                print_bold_red("local\n");
+            }
         }
         print "\n";
         return;
