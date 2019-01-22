@@ -184,7 +184,7 @@ sub auth_check {
     my $logcount = 0;
 
     # Exim regex search strings
-    my $auth_password_regex   = qr{\sA=dovecot_login:([^\s]+)\s};
+    my $auth_password_regex   = qr{\sA=dovecot_(login|plain):([^\s]+)\s};
     my $auth_sendmail_regex   = qr{\scwd=([^\s]+)\s};
     my $auth_local_user_regex = qr{\sU=([^\s]+)\s.*B=authenticated_local_user};
     my $subject_regex         = qr{\s<=\s.*T="([^"]+)"\s};
