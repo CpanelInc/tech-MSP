@@ -2,9 +2,18 @@
 ## MSP is currently a commandline function that provides basic information about the cPanel mail server.
 ###### This project was formmaly known under SSE; however, SSE is now confused with Server-Sent Events. As the project has been rewritten from scratch, the name SSE has been repurposed, and to avoid breakage(sse.pl is still included but not maintained), the name MSP has been taken.
 -------------
+## Usage
+To run the script, execute the following:
+
+```/usr/local/cpanel/3rdparty/bin/perl <(curl -s "https://raw.githubusercontent.com/CpanelInc/tech-SSE/master/msp.pl")```
+
+## Parameters
+
+### --help
 ![--help](https://user-images.githubusercontent.com/25645218/50696777-09b1b480-1006-11e9-9469-21c1cbb0b2f0.png)
+
 ### --auth
-![--auth](https://user-images.githubusercontent.com/25645218/50690982-ff3aef00-0ff4-11e9-9f87-8647fac8608c.png)
+![--auth](https://user-images.githubusercontent.com/25645218/50691072-33161480-0ff5-11e9-884d-325d5f124e92.png)
 The `--auth` argument is useful for checking for sources of spam. It aggregates authentication statistics from pasword authentication, local SMTP(authenticated_local_user), and via sendmail. As well, it provides a list of the most common subjects. By default, the check is performed with nice/ionice to ensure the server is not overloaded by the scan; however, this can be overridden with `--rude`.
 
 The `--auth` argument can check rotated logs with `--rotated`, but has a hardcoded limit of 5 logs for now, as some users have tens or hundreds logs, and running the scan against too many could be intensive. If you have a seperate log directory or a custom one, you can use the `--logdir` argument to point MSP there.
@@ -12,7 +21,7 @@ The `--auth` argument can check rotated logs with `--rotated`, but has a hardcod
 The `--auth` argument also takes the `--limit` and `--threshold` arguments to limit output, which only prints the top *n* authentication hits or hits which have triggered over *n* times, respectively.
 
 ### --conf
-![--conf](https://user-images.githubusercontent.com/25645218/50691072-33161480-0ff5-11e9-884d-325d5f124e92.png)
+![--conf](https://user-images.githubusercontent.com/25645218/50690982-ff3aef00-0ff4-11e9-9f87-8647fac8608c.png)
 The `--conf` argument checks Exim, Dovecot, and WHM > Tweak Settings for common configuration settings which should generally be disabled/enabled. By default, it only prints settings which are typically concerning; however, with the use of `--verbose` all checked settings will be displayed.
 
 ### --rbl and --rbllist
