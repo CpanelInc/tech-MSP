@@ -90,10 +90,23 @@ sub print_help {
 }    
 
 sub main {
-   if ( (!%opts) || ($opts{help}) ) {
-        print_help();
-    }
-    if ($opts{conf}) {
+    die "MSP must be run as root\n" if ( $< != 0 );
+
+    print_help() if ( (!%opts) || ($opts{help}) );
+
+    conf_check() if ($opts{conf});
+
+    print_exim_queue() if ($opts{queue});
+
+    auth_check() if ($opts{auth});
+
+    rbl_list() if ($opts{rbllist});
+
+    rbl_check($opts{rbl}) if ($opts{rbl});
+    return;
+}
+
+sub conf_check {
         # Check Tweak Settings
         print_bold_white("Checking Tweak Settings...\n");
         print "--------------------------\n";
@@ -154,26 +167,9 @@ sub main {
             print_info("Allow Plaintext Authentication is disabled\n");
         }
         print "\n";
-    }
-
-    if ($opts{queue}) {
-        print_exim_queue();
-    }
-
-    if ($opts{auth}) {
-        auth_check();
-    }
-
-    if ($opts{rbllist}) {
-        rbl_list();
-    }
-
-    if ($opts{rbl}) {
-        @rbl = split( /,/, $opts{rbl});
-        rbl_check(@rbl);
-    }
-    return;
+        return;
 }
+   
 
 sub auth_check {
     my @logfiles;
@@ -295,7 +291,8 @@ sub get_exim_queue {
     }
 
 sub rbl_check {
-    my @rbls = @_;
+    my $rbls = shift;
+    my @rbls = split( /,/, $rbls);
     my @ips;
 
     # Fetch IP's... should we only check mailips? this is more thorough...
