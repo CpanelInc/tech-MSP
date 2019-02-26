@@ -19,12 +19,14 @@ our $VERSION = '2.0';
 
 $Term::ANSIColor::AUTORESET = 1;
 
-our $LOGDIR               = q{/var/log/};
+our $LOGDIR                = q{/var/log/};
 our $CPANEL_CONFIG_FILE    = q{/var/cpanel/cpanel.config};
 our $EXIM_LOCALOPTS_FILE   = q{/etc/exim.conf.localopts};
 our $DOVECOT_CONF          = q{/var/cpanel/conf/dovecot/main};
 
 our $EXIM_MAINLOG          = q{exim_mainlog};
+our $MAILLOG               = q{/var/log/maillog};
+
 our @RBLS                  = qw{ b.barracudacentral.org
                                  bl.spamcop.net
                                  dnsbl.sorbs.net
@@ -51,6 +53,7 @@ GetOptions(
     'conf',
     'limit=i{1}',
     'logdir=s{1}',
+    'maillog',
     'queue',
     'rbl=s',
     'rbllist',
@@ -77,6 +80,7 @@ sub print_help {
 #    printf( "\t%-15s %s\n", "--ignore", "ignore common statistics (e.g. cwd=/var/spool/exim)");
     printf( "\t%-15s %s\n",  "--limit", "limit statistics checks to n results (defaults to 10, set to 0 for no limit)");
     printf( "\t%-15s %s\n",  "--logdir", "specify an alternative logging directory, (defaults to /var/log)");
+    printf( "\t%-15s %s\n",  "--maillog", "check maillog for common errors");
     printf( "\t%-15s %s\n",  "--queue", "print exim queue length");
 #    printf( "\t%-15s %s\n", "--quiet", "only print alarming information or statistics (requires --threshold)");
     printf( "\t%-15s %s\n",  "--rbl", "check IP's against provided blacklists(comma delimited)");
@@ -99,6 +103,8 @@ sub main {
     print_exim_queue() if ($opts{queue});
 
     auth_check() if ($opts{auth});
+
+    maillog_check() if ($opts{maillog});
 
     rbl_list() if ($opts{rbllist});
 
@@ -337,6 +343,102 @@ sub rbl_list {
         print "$rbl\n";
     }
     print "\n";
+    return;
+}
+
+sub maillog_check {
+    my @logfiles;
+    my $logcount = 0;
+    my @out_of_memory;
+    my @getquota_failed;
+    my $pyzor_timeout = 0;
+
+    # Error regex search strings
+    my $out_of_memory_regex    = qr{lmtp\(([\w\.@]+)\):\sFatal:\s\S+:\sOut\sof\smemory$};
+    my $get_quota_failed_regex = qr{Error:\smailbox_get_status.+quota-fs:\squotactl\(Q_GETQUOTA, ([\w/]+)\)\sfailed:\s(.+)};
+    my $pyzor_timeout_regex    = qr{Did\snot\sreceive\sa\sresponse\sfrom\sthe\spyzor\sserver\spublic\.pyzor\.org};
+
+    print_bold_white("Checking Maillog for common errors...\n");
+    print "-----------------------------------------\n";
+
+    # Set logdir, ensure trailing slash, and bail if the provided logdir doesn't exist:
+    my $logdir = ($opts{logdir}) ? ($opts{logdir}) : $LOGDIR;
+    $logdir =~ s@/*$@/@;
+
+    if (!-d $logdir) {
+        print_warn("$opts{logdir}: No such file or directory. Skipping spam check...\n\n");
+        return;
+    }
+
+    # Collect log files
+    for my $file ( grep { m/^maillog/ } @{ Cpanel::FileUtils::Dir::get_directory_nodes($logdir) } ) {
+        if ( $opts{rotated} ) {
+            if ( ( $file =~ m/maillog-/ ) && ( $logcount ne $ROTATED_LIMIT ) ) {
+                push @logfiles, $file;
+                $logcount++;
+            }
+        }
+        push @logfiles, $file if ( $file =~ m/maillog$/ );
+    }
+    print_warn("Safeguard triggered... --rotated is limited to $ROTATED_LIMIT logs\n") if ( $logcount eq $ROTATED_LIMIT );
+
+    # Bail if we can't find any logs
+    return print_warn("Bailing, no maillog found...\n\n") if (!@logfiles);
+
+    # Set ionice
+    my %cpconf = get_conf( $CPANEL_CONFIG_FILE );
+    if ( ( !$opts{rude} ) && ( Cpanel::IONice::ionice( 'best-effort', exists $cpconf{'ionice_import_exim_data'} ? $cpconf{'ionice_import_exim_data'} : 6 ) ) ) {
+        print("Setting I/O priority to reduce system load: " . Cpanel::IONice::get_ionice() . "\n\n");
+        setpriority( 0, 0, 19 );
+    }
+
+    my $fh;
+    lOG: for my $log ( @logfiles ) {
+        if ( $log =~ /[.]gz$/ ) {
+            my @cmd = ( qw{ gunzip -c -f }, $logdir . $log );
+            if ( !open $fh, '-|', @cmd ) {
+                print_warn("Skipping $logdir/$log: Cannot open pipe to read stdout from command '@{ [ join ' ', @cmd ] }' : $!\n");
+                next LOG;
+            }
+        } else {
+            if ( !open $fh, '<', $logdir . $log ) {
+                print_warn("Skipping $logdir/$log: Cannot open for reading $!\n");
+                next LOG;
+            }
+        }
+        while ( my $block = Cpanel::IO::read_bytes_to_end_of_line( $fh, 65_535 ) ) {
+            foreach my $line ( split( m{\n}, $block ) ) {
+                push @out_of_memory, $1 if ($line =~ $out_of_memory_regex);
+                push @getquota_failed, "$1: $2" if ($line =~ $get_quota_failed_regex);
+                ++$pyzor_timeout if ($line =~ $pyzor_timeout_regex);
+            }
+        }
+        close($fh);
+    }
+
+    # Print info
+    print_bold_white("LMTP quota issues:\n");
+    if (@getquota_failed) {
+        sort_uniq(@getquota_failed);
+    } else {
+        print "None\n";
+    }
+    print "\n";
+    print_bold_white("Email accounts triggering LMTP Out of memory:\n");
+    if (@out_of_memory) {
+        sort_uniq(@out_of_memory);
+    } else {
+        print "None\n";
+    }
+    print "\n";
+    print_bold_white("Timeouts to public.pyzor.org:24441:\n");
+    if ($pyzor_timeout ne 0) {
+        print "Pyzor timed out $pyzor_timeout times\n";
+    } else {
+        print "None\n";
+    }
+    print "\n";
+
     return;
 }
 
