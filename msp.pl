@@ -180,7 +180,7 @@ sub auth_check {
     my $logcount = 0;
 
     # Exim regex search strings
-    my $auth_password_regex   = qr{\sA=dovecot_login:([^\s]+)\s};
+    my $auth_password_regex   = qr{\sA=dovecot_(login|plain):([^\s]+)\s};
     my $auth_sendmail_regex   = qr{\scwd=([^\s]+)\s};
     my $auth_local_user_regex = qr{\sU=([^\s]+)\s.*B=authenticated_local_user};
     my $subject_regex         = qr{\s<=\s.*T="([^"]+)"\s};
@@ -235,7 +235,7 @@ sub auth_check {
         }
         while ( my $block = Cpanel::IO::read_bytes_to_end_of_line( $fh, 65_535 ) ) {
             foreach my $line ( split( m{\n}, $block ) ) {
-                push @auth_password_hits, $1 if ($line =~ $auth_password_regex);
+                push @auth_password_hits, $2 if ($line =~ $auth_password_regex);
                 push @auth_sendmail_hits, $1 if ($line =~ $auth_sendmail_regex);
                 push @auth_local_user_hits, $1 if ($line =~ $auth_local_user_regex);
                 push @subject_hits, $1 if ($line =~ $subject_regex);
