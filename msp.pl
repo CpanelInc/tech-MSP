@@ -427,7 +427,7 @@ sub maillog_check {
         while ( my $block = Cpanel::IO::read_bytes_to_end_of_line( $fh, 65_535 ) ) {
             foreach my $line ( split( m{\n}, $block ) ) {
                 push @out_of_memory, $1 if ($line =~ $out_of_memory_regex);
-                push @quota_failed, "$1: $2" if ($line =~ $quotactl_failed_regex);
+                push @quota_failed, $1 if ($line =~ $quotactl_failed_regex);
                 ++$pyzor_timeout if ($line =~ $pyzor_timeout_regex);
             }
         }
