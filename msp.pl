@@ -349,14 +349,32 @@ sub rbl_list {
 sub maillog_check {
     my @logfiles;
     my $logcount = 0;
-    my @out_of_memory;
-    my @getquota_failed;
-    my $pyzor_timeout = 0;
 
-    # Error regex search strings
-    my $out_of_memory_regex    = qr{lmtp\(([\w\.@]+)\):\sFatal:\s\S+:\sOut\sof\smemory$};
-    my $get_quota_failed_regex = qr{Error:\smailbox_get_status.+quota-fs:\squotactl\(Q_GETQUOTA, ([\w/]+)\)\sfailed:\s(.+)};
-    my $pyzor_timeout_regex    = qr{Did\snot\sreceive\sa\sresponse\sfrom\sthe\spyzor\sserver\spublic\.pyzor\.org};
+    # General
+    my @out_of_memory;
+    my $out_of_memory_regex     = qr{lmtp\(([\w\.@]+)\): Fatal: \S+: Out of memory};
+
+    my $time_backwards          = 0;
+    my $time_backwards_regex    = qr{Fatal: Time just moved backwards by \d+ \w+\. This might cause a lot of problems, so I'll just kill myself now};
+
+    # Quota errors
+    my @quota_failed;
+    my $quotactl_failed_regex   = qr{quota-fs: (quotactl\(Q_X?GETQUOTA, [\w/]+\) failed: .+)};
+    my $ioctl_failed_regex      = qr{quota-fs: (ioctl\([\w/]+, Q_QUOTACTL\) failed: .+)};
+    my $invalid_nfs_regex       = qr{quota-fs: (.+ is not a valid NFS device path)};
+    my $unrespponsive_rpc_regex = qr{quota-fs: (could not contact RPC service on .+)};
+    my $rquota_remote_regex     = qr{quota-fs: (remote( ext)? rquota call failed: .+)};
+    my $rquota_eacces_regex     = qr{quota-fs: (permission denied to( ext)? rquota service)};
+    my $rquota_compile_regex    = qr{quota-fs: (rquota not compiled with group support)};
+    my $dovecot_compile_regex   = qr{quota-fs: (Dovecot was compiled with Linux quota .+)};
+    my $unrec_code_regex        = qr{quota-fs: (unrecognized status code .+)};
+
+    # Spamd error
+    my $pyzor_timeout           = 0;
+    my $pyzor_timeout_regex     = qr{Timeout: Did not receive a response from the pyzor server public\.pyzor\.org};
+
+    my $pyzor_unreachable       = 0;
+    my $pyzor_unreachable_regex = qr{pyzor: check failed: Cannot connect to public.pyzor.org:24441: IO::Socket::INET: connect: Network is unreachable};
 
     print_bold_white("Checking Maillog for common errors...\n");
     print "-----------------------------------------\n";
@@ -409,7 +427,7 @@ sub maillog_check {
         while ( my $block = Cpanel::IO::read_bytes_to_end_of_line( $fh, 65_535 ) ) {
             foreach my $line ( split( m{\n}, $block ) ) {
                 push @out_of_memory, $1 if ($line =~ $out_of_memory_regex);
-                push @getquota_failed, "$1: $2" if ($line =~ $get_quota_failed_regex);
+                push @quota_failed, "$1: $2" if ($line =~ $quotactl_failed_regex);
                 ++$pyzor_timeout if ($line =~ $pyzor_timeout_regex);
             }
         }
@@ -418,8 +436,8 @@ sub maillog_check {
 
     # Print info
     print_bold_white("LMTP quota issues:\n");
-    if (@getquota_failed) {
-        sort_uniq(@getquota_failed);
+    if (@quota_failed) {
+        sort_uniq(@quota_failed);
     } else {
         print "None\n";
     }
