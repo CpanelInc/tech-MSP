@@ -25,7 +25,7 @@ our $EXIM_LOCALOPTS_FILE   = q{/etc/exim.conf.localopts};
 our $DOVECOT_CONF          = q{/var/cpanel/conf/dovecot/main};
 
 our $EXIM_MAINLOG          = q{exim_mainlog};
-our $MAILLOG               = q{/var/log/maillog};
+our $MAILLOG               = q{maillog};
 
 our @RBLS                  = qw{ b.barracudacentral.org
                                  bl.spamcop.net
