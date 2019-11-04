@@ -12,7 +12,7 @@ use Cpanel::IO                                      ();
 use Term::ANSIColor                     qw{:constants};
 
 # Variables
-our $VERSION = '2.0';
+our $VERSION = '2.1';
 
 $Term::ANSIColor::AUTORESET = 1;
 
