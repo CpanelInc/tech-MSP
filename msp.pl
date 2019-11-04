@@ -6,12 +6,9 @@ use warnings;
 
 use Getopt::Long;
 use Cpanel::AdvConfig::dovecot                      ();
-use Cpanel::DnsRoots::Resolver                      ();
 use Cpanel::FileUtils::Dir                          ();
 use Cpanel::IONice                                  ();
 use Cpanel::IO                                      ();
-use Cpanel::NAT                qw{:get_all_public_ips};
-use Whostmgr::Ips                                   ();  
 use Term::ANSIColor                     qw{:constants};
 
 # Variables
@@ -303,12 +300,14 @@ sub rbl_check {
 
     # Fetch IP's... should we only check mailips? this is more thorough...
     # could ignore local through bogon regex?
-    my $ipref = Whostmgr::Ips::get_detailed_ip_cfg();
-    foreach my $iphash ( @{$ipref} ) {
-        push @ips, Cpanel::NAT::get_public_ip( $iphash->{'ip'} );
-    }
+    return unless my $ips = get_ips();
+
     # Uncomment the following for testing positive hits
-    # push @ips, qw { 127.0.0.2 };
+    # push @$ips, qw{ 127.0.0.2 };
+
+    # In cPanel 11.84, we switched to the libunbound resolver
+    my ($cp_numeric_version, $cp_original_version) = get_cpanel_version();
+    my $libunbound = (version_compare($cp_numeric_version, qw( < 11.84))) ? 0 : 1;
 
     # If "all" is found in the --rbl arg, ignore rest, use default rbl list
     # maybe we should append so that user can specify all and ones which are not included in the list?
@@ -316,22 +315,29 @@ sub rbl_check {
     print_bold_white("Checking IP's against RBL's...\n");
     print "------------------------------\n";
 
-    foreach my $ip (@ips) {
+    foreach my $ip (@$ips) {
         print "$ip:\n";
         my $ip_rev = join('.', reverse split('\.', $ip));
         foreach my $rbl (@rbls) {
-            # Do we need to call this on each lookup or can we move this outside the loop?
-            my $res = Cpanel::DnsRoots::Resolver->new();
-            if (grep { /127\.0\.0\./ } $res->recursive_query( "$ip_rev" . '.' . "$rbl", 'A')) {
-                 printf("\t%-25s ", $rbl);
+            printf("\t%-25s ", $rbl);
+
+            my $result;
+            if ($libunbound) {
+                $result = dns_query("$ip_rev.$rbl", 'A')->[0] || 0;
+            } else {
+                # This uses libunbound, which will return an aref, but we can always expect just one result here
+                $result = dns_query_pre_84("$ip_rev.$rbl", 'A') || 0;
+            }
+
+            if ( $result =~ /\A 127\.0\.0\./xms ) {
                  print_bold_red("LISTED\n");
             } else {
-                 printf("\t%-25s ", $rbl);
                  print_bold_green("GOOD\n");
             }
         }
         print "\n";
     }
+
     return;
 }
 
@@ -460,6 +466,117 @@ sub maillog_check {
     return;
 }
 
+sub version_compare {
+    # example: return if version_compare($ver_string, qw( >= 1.2.3.3 ));
+    # Must be no more than four version numbers separated by periods and/or underscores.
+    my ( $ver1, $mode, $ver2 ) = @_;
+    return if ( !defined($ver1) || ( $ver1 =~ /[^\._0-9]/ ) );
+    return if ( !defined($ver2) || ( $ver2 =~ /[^\._0-9]/ ) );
+
+    # Shamelessly copied the comparison logic out of Cpanel::Version::Compare
+    my %modes = (
+        '>' => sub {
+            return if $_[0] eq $_[1];
+            return _version_cmp(@_) > 0;
+        },
+        '<' => sub {
+            return if $_[0] eq $_[1];
+            return _version_cmp(@_) < 0;
+        },
+        '==' => sub { return $_[0] eq $_[1] || _version_cmp(@_) == 0; },
+        '!=' => sub { return $_[0] ne $_[1] && _version_cmp(@_) != 0; },
+        '>=' => sub {
+            return 1 if $_[0] eq $_[1];
+            return _version_cmp(@_) >= 0;
+        },
+        '<=' => sub {
+            return 1 if $_[0] eq $_[1];
+            return _version_cmp(@_) <= 0;
+        }
+    );
+    return if ( !exists $modes{$mode} );
+    return $modes{$mode}->( $ver1, $ver2 );
+}
+
+sub _version_cmp {
+    my ( $first, $second ) = @_;
+    my ( $a1, $b1, $c1, $d1 ) = split /[\._]/, $first;
+    my ( $a2, $b2, $c2, $d2 ) = split /[\._]/, $second;
+    for my $ref ( \$a1, \$b1, \$c1, \$d1, \$a2, \$b2, \$c2, \$d2, ) {    # Fill empties with 0
+        $$ref = 0 unless defined $$ref;
+    }
+    return $a1 <=> $a2 || $b1 <=> $b2 || $c1 <=> $c2 || $d1 <=> $d2;
+}
+
+sub get_cpanel_version {
+    my $cpanel_version_file = '/usr/local/cpanel/version';
+    my $numeric_version;
+    my $original_version;
+
+    if ( open my $file_fh, '<', $cpanel_version_file ) {
+        $original_version = readline($file_fh);
+        close $file_fh;
+    }
+    return ( 'UNKNOWN', 'UNKNOWN' ) unless defined $original_version;
+    chomp $original_version;
+
+    # Parse either 1.2.3.4 or 1.2.3-THING_4 to 1.2.3.4
+    $numeric_version = join( '.', split( /\.|-[a-zA-Z]+_/, $original_version ) );
+    $numeric_version = 'UNKNOWN' unless $numeric_version =~ /^\d+\.\d+\.\d+\.\d+$/;
+
+    return ( $numeric_version, $original_version );
+}
+
+sub get_ips {
+    my @ips;
+    return if !load_module_with_fallbacks(
+        'needed_subs'  => [qw{get_detailed_ip_cfg}],
+        'modules'      => [qw{Whostmgr::Ips}],
+        'fail_warning' => 'can\'t load Whostmgr::Ips',
+    );
+
+    return if !load_module_with_fallbacks(
+        'needed_subs'  => [qw{get_public_ip}],
+        'modules'      => [qw{Cpanel::NAT}],
+        'fail_warning' => 'can\'t load Cpanel::NAT',
+    );
+
+    my $ipref = Whostmgr::Ips::get_detailed_ip_cfg();
+    foreach my $iphash ( @{$ipref} ) {
+        push @ips, Cpanel::NAT::get_public_ip( $iphash->{'ip'} );
+    }
+
+    return \@ips;
+}
+
+sub dns_query_pre_84 {
+    my ($name, $type) = @_;
+
+    return if !load_module_with_fallbacks(
+        'needed_subs'  => [qw{new recursive_query}],
+        'modules'      => [qw{Cpanel::DnsRoots::Resolver}],
+        'fail_warning' => 'can\'t load Cpanel::DnsRoots::Resolver',
+    );
+
+    my $dns   = Cpanel::DnsRoots::Resolver->new();
+    my ($res) = $dns->recursive_query( $name, $type );
+    return $res;
+}
+
+sub dns_query {
+    my($name, $type) = @_;
+
+    return if !load_module_with_fallbacks(
+        'needed_subs'  => [qw{new recursive_queries}],
+        'modules'      => [qw{Cpanel::DNS::Unbound}],
+        'fail_warning' => 'can\'t load Cpanel::DNS::Unbound',
+    );
+
+    my $dns   = Cpanel::DNS::Unbound->new();
+    my ($res) = $dns->recursive_queries( [ [ $name, $type ] ] )->[0];
+    return $res->{'decoded_data'} || $res->{result}{data};
+}
+
 sub sort_uniq {
     my @input = @_;
     my %count;
@@ -545,6 +662,58 @@ sub _timedsaferun {    # Borrowed from WHM 66 Cpanel::SafeRun::Timed and modifie
         kill( 9, $pid );     #KILL
     }
     return defined $output ? $output : '';
+}
+
+# SUB load_module_with_fallbacks(
+#   'modules'      => [ 'module1', 'module2', ... ],
+#   'needed_subs'  => [ 'do_needful', ... ],
+#   'fallback'     => sub { *do_needful = sub { ... }; return; },
+#   'fail_warning' => "Oops, something went wrong, you may want to do something about this",
+#   'fail_fatal'   => 1,
+# );
+#
+# Input is HASH of options:
+#   'modules'      => ARRAYREF of SCALAR strings corresponding to module names to attempt to import. These are attempted first.
+#   'needed_subs'  => ARRAYREF of SCALAR strings corresponding to subroutine names you need defined from the module(s).
+#   'fallback'     => CODEREF which defines the needed subs manually. Only used if all modules passed in above fail to load. Optional.
+#   'fail_warning' => SCALAR string that will convey a message to the user if the module(s) fail to load. Optional.
+#   'fail_fatal'   => BOOL whether you want to die if you fail to load the needed subs/modules via all available methods. Optional.
+#
+# Returns the module/namespace that loaded correctly, throws if all available attempts at finding the desired needed_subs subs fail and fail_fatal is passed.
+sub load_module_with_fallbacks {
+    my %opts = @_;
+    my $namespace_loaded;
+    foreach my $module2try ( @{ $opts{'modules'} } ) {
+
+        # Don't 'require' it if we already have it.
+        my $inc_entry = join( "/", split( "::", $module2try ) ) . ".pm";
+        if ( !$INC{$module2try} ) {
+            local $@;
+            next if !eval "require $module2try; 1";    ## no critic (StringyEval)
+        }
+
+        # Check if the imported modules 'can' do the job
+        next if ( scalar( grep { $module2try->can($_) } @{ $opts{'needed_subs'} } ) != scalar( @{ $opts{'needed_subs'} } ) );
+
+        # Ok, we're good to go!
+        $namespace_loaded = $module2try;
+        last;
+    }
+
+    # Fallback to coderef, but don't do sanity checking on this, as it is presumed the caller "knows what they are doing" if passing a coderef.
+    if ( !$namespace_loaded ) {
+        if ( !$opts{'fallback'} || ref $opts{'fallback'} != 'CODE' ) {
+            print_warn( 'Missing Perl Module(s): ' . join( ', ', @{ $opts{'modules'} } ) . ' -- ' . $opts{'fail_warning'} . " -- Try using /usr/local/cpanel/3rdparty/bin/perl?\n" ) if $opts{'fail_warning'};
+            die "Stopping here." if $opts{'fail_fatal'};
+        }
+        else {
+            $opts{'fallback'}->();
+
+            # call like main::subroutine instead of Name::Space::subroutine
+            $namespace_loaded = 'main';
+        }
+    }
+    return $namespace_loaded;
 }
 
 # pretty prints
