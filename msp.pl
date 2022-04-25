@@ -5,37 +5,36 @@ use strict;
 use warnings;
 
 use Getopt::Long;
-use Cpanel::AdvConfig::dovecot                      ();
-use Cpanel::FileUtils::Dir                          ();
-use Cpanel::IONice                                  ();
-use Cpanel::IO                                      ();
-use Term::ANSIColor                     qw{:constants};
+use Cpanel::AdvConfig::dovecot ();
+use Cpanel::FileUtils::Dir     ();
+use Cpanel::IONice             ();
+use Cpanel::IO                 ();
+use Term::ANSIColor qw{:constants};
+$Term::ANSIColor::AUTORESET = 1;
 
 # Variables
 our $VERSION = '2.1';
 
-$Term::ANSIColor::AUTORESET = 1;
+our $LOGDIR              = q{/var/log/};
+our $CPANEL_CONFIG_FILE  = q{/var/cpanel/cpanel.config};
+our $EXIM_LOCALOPTS_FILE = q{/etc/exim.conf.localopts};
+our $DOVECOT_CONF        = q{/var/cpanel/conf/dovecot/main};
 
-our $LOGDIR                = q{/var/log/};
-our $CPANEL_CONFIG_FILE    = q{/var/cpanel/cpanel.config};
-our $EXIM_LOCALOPTS_FILE   = q{/etc/exim.conf.localopts};
-our $DOVECOT_CONF          = q{/var/cpanel/conf/dovecot/main};
+our $EXIM_MAINLOG = q{exim_mainlog};
+our $MAILLOG      = q{maillog};
 
-our $EXIM_MAINLOG          = q{exim_mainlog};
-our $MAILLOG               = q{maillog};
-
-our @RBLS                  = qw{ b.barracudacentral.org
-                                 bl.spamcop.net
-                                 dnsbl.sorbs.net
-                                 spam.dnsbl.sorbs.net
-                                 ips.backscatterer.org
-                                 zen.spamhaus.org
-                               };
+our @RBLS = qw{ b.barracudacentral.org
+  bl.spamcop.net
+  dnsbl.sorbs.net
+  spam.dnsbl.sorbs.net
+  ips.backscatterer.org
+  zen.spamhaus.org
+};
 
 # Initialize
-our $LIMIT = 10;
-our $THRESHOLD = 1;
-our $ROTATED_LIMIT = 5; # I've seen users with hundreds of rotated logs before, we should safeguard to prevent msp from working against unreasonably large data set
+our $LIMIT         = 10;
+our $THRESHOLD     = 1;
+our $ROTATED_LIMIT = 5;    # I've seen users with hundreds of rotated logs before, we should safeguard to prevent msp from working against unreasonably large data set
 our $OPT_TIMEOUT;
 
 # Options
@@ -69,110 +68,121 @@ sub print_help {
     print BOLD WHITE ON_BLACK "Mail Status Probe: Mail authentication statistics and configuration checker\n";
     print "Usage: ./msp.pl --auth --rotated --rude\n";
     print "       ./msp.pl --conf --rbl [all|bl.spamcop.net,zen.spamhaus.org]\n\n";
-    printf( "\t%-15s %s\n",  "--help", "print this help message");
-#    printf( "\t%-15s %s\n", "--all", "run all checks");
-    printf( "\t%-15s %s\n",  "--auth", "print mail authentication statistics");
-    printf( "\t%-15s %s\n",  "--conf", "print mail configuration info (e.g. require_secure_auth, smtpmailgidonly, etc.)");
-#    printf( "\t%-15s %s\n", "--forwards", "print forward relay statistics");
-#    printf( "\t%-15s %s\n", "--ignore", "ignore common statistics (e.g. cwd=/var/spool/exim)");
-    printf( "\t%-15s %s\n",  "--limit", "limit statistics checks to n results (defaults to 10, set to 0 for no limit)");
-    printf( "\t%-15s %s\n",  "--logdir", "specify an alternative logging directory, (defaults to /var/log)");
-    printf( "\t%-15s %s\n",  "--maillog", "check maillog for common errors");
-    printf( "\t%-15s %s\n",  "--queue", "print exim queue length");
-#    printf( "\t%-15s %s\n", "--quiet", "only print alarming information or statistics (requires --threshold)");
-    printf( "\t%-15s %s\n",  "--rbl", "check IP's against provided blacklists(comma delimited)");
-    printf( "\t%-15s %s\n",  "--rbllist", "list available RBL's");
-    printf( "\t%-15s %s\n",  "--rotated", "check rotated exim logs");
-    printf( "\t%-15s %s\n",  "--rude", "forgo nice/ionice settings");
-    printf( "\t%-15s %s\n",  "--threshold", "limit statistics output to n threshold(defaults to 1)");
-    printf( "\t%-15s %s\n",  "--verbose", "display all information");
+    printf( "\t%-15s %s\n", "--help", "print this help message" );
+
+    #    printf( "\t%-15s %s\n", "--all", "run all checks");
+    printf( "\t%-15s %s\n", "--auth", "print mail authentication statistics" );
+    printf( "\t%-15s %s\n", "--conf", "print mail configuration info (e.g. require_secure_auth, smtpmailgidonly, etc.)" );
+
+    #    printf( "\t%-15s %s\n", "--forwards", "print forward relay statistics");
+    #    printf( "\t%-15s %s\n", "--ignore", "ignore common statistics (e.g. cwd=/var/spool/exim)");
+    printf( "\t%-15s %s\n", "--limit",   "limit statistics checks to n results (defaults to 10, set to 0 for no limit)" );
+    printf( "\t%-15s %s\n", "--logdir",  "specify an alternative logging directory, (defaults to /var/log)" );
+    printf( "\t%-15s %s\n", "--maillog", "check maillog for common errors" );
+    printf( "\t%-15s %s\n", "--queue",   "print exim queue length" );
+
+    #    printf( "\t%-15s %s\n", "--quiet", "only print alarming information or statistics (requires --threshold)");
+    printf( "\t%-15s %s\n", "--rbl",       "check IP's against provided blacklists(comma delimited)" );
+    printf( "\t%-15s %s\n", "--rbllist",   "list available RBL's" );
+    printf( "\t%-15s %s\n", "--rotated",   "check rotated exim logs" );
+    printf( "\t%-15s %s\n", "--rude",      "forgo nice/ionice settings" );
+    printf( "\t%-15s %s\n", "--threshold", "limit statistics output to n threshold(defaults to 1)" );
+    printf( "\t%-15s %s\n", "--verbose",   "display all information" );
     print "\n";
-    exit;
-}    
+    exit;    ## no critic (NoExitsFromSubroutines)
+}
 
 sub main {
     die "MSP must be run as root\n" if ( $< != 0 );
 
-    print_help() if ( (!%opts) || ($opts{help}) );
+    print_help() if ( ( !%opts ) || ( $opts{help} ) );
 
-    conf_check() if ($opts{conf});
+    conf_check() if ( $opts{conf} );
 
-    print_exim_queue() if ($opts{queue});
+    print_exim_queue() if ( $opts{queue} );
 
-    auth_check() if ($opts{auth});
+    auth_check() if ( $opts{auth} );
 
-    maillog_check() if ($opts{maillog});
+    maillog_check() if ( $opts{maillog} );
 
-    rbl_list() if ($opts{rbllist});
+    rbl_list() if ( $opts{rbllist} );
 
-    rbl_check($opts{rbl}) if ($opts{rbl});
+    rbl_check( $opts{rbl} ) if ( $opts{rbl} );
     return;
 }
 
 sub conf_check {
-        # Check Tweak Settings
-        print_bold_white("Checking Tweak Settings...\n");
-        print "--------------------------\n";
-        my %cpconf = get_conf( $CPANEL_CONFIG_FILE );
-        if ( $cpconf{'smtpmailgidonly'} ne 1 ) {
-            print_warn("Restrict outgoing SMTP to root, exim, and mailman (FKA SMTP Tweak) is disabled!\n"); 
-        } elsif ( $opts{verbose} ) {
-            print_info("Restrict outgoing SMTP to root, exim, and mailman (FKA SMTP Tweak) is enabled\n");
-        }
-        if ( $cpconf{'nobodyspam'} ne 1 ) {
-            print_warn("Prevent “nobody” from sending mail is disabled!\n"); 
-        } elsif ( $opts{verbose} ) {
-            print_info("Prevent “nobody” from sending mail is enabled\n");
-        }
-        if ( $cpconf{'popbeforesmtp'} ne 0 ) {
-            print_warn("Pop-before-SMTP is enabled!\n"); 
-        } elsif ( $opts{verbose} ) {
-            print_info("Pop-before-SMTP is disabled\n");
-        }
-        if ( $cpconf{'domainowner_mail_pass'} ne 0 ) {
-            print_warn("Mail authentication via domain owner password is enabled!\n"); 
-        } elsif ( $opts{verbose} ) {
-            print_info("Mail authentication via domain owner password is disabled\n");
-        }
-        print "\n";
 
-        # Check Exim Configuration
-        print_bold_white("Checking Exim Configuration...\n");
-        print "------------------------------\n";
-        my %exim_localopts_conf = get_conf( $EXIM_LOCALOPTS_FILE );
-        if ( $exim_localopts_conf{'allowweakciphers'} ne 0 ) {
-            print_warn("Allow weak SSL/TLS ciphers is enabled!\n"); 
-        } elsif ( $opts{verbose} ) {
-            print_info("Allow weak SSL/TLS ciphers is disabled\n");
-        }   
-        if ( $exim_localopts_conf{'require_secure_auth'} ne 1 ) {
-            print_warn("Require clients to connect with SSL or issue the STARTTLS is disabled!\n"); 
-        } elsif ( $opts{verbose} ) {
-            print_info("Require clients to connect with SSL or issue the STARTTLS is enabled\n");
-        }
-        if ( $exim_localopts_conf{'systemfilter'} ne q{/etc/cpanel_exim_system_filter} ) {
-           print_warn("Custom System Filter File in use: $exim_localopts_conf{'systemfilter'}\n");
-        } elsif ( $opts{verbose} ) {
-           print_info("System Filter File is set to the default path: $exim_localopts_conf{'systemfilter'}\n");
-        }
-        print "\n";
+    # Check Tweak Settings
+    print_bold_white("Checking Tweak Settings...\n");
+    print "--------------------------\n";
+    my %cpconf = get_conf($CPANEL_CONFIG_FILE);
+    if ( $cpconf{'smtpmailgidonly'} ne 1 ) {
+        print_warn("Restrict outgoing SMTP to root, exim, and mailman (FKA SMTP Tweak) is disabled!\n");
+    }
+    elsif ( $opts{verbose} ) {
+        print_info("Restrict outgoing SMTP to root, exim, and mailman (FKA SMTP Tweak) is enabled\n");
+    }
+    if ( $cpconf{'nobodyspam'} ne 1 ) {
+        print_warn("Prevent “nobody” from sending mail is disabled!\n");
+    }
+    elsif ( $opts{verbose} ) {
+        print_info("Prevent “nobody” from sending mail is enabled\n");
+    }
+    if ( $cpconf{'popbeforesmtp'} ne 0 ) {
+        print_warn("Pop-before-SMTP is enabled!\n");
+    }
+    elsif ( $opts{verbose} ) {
+        print_info("Pop-before-SMTP is disabled\n");
+    }
+    if ( $cpconf{'domainowner_mail_pass'} ne 0 ) {
+        print_warn("Mail authentication via domain owner password is enabled!\n");
+    }
+    elsif ( $opts{verbose} ) {
+        print_info("Mail authentication via domain owner password is disabled\n");
+    }
+    print "\n";
 
-        # Check Dovecot Configuration
-        print_bold_white("Checking Dovecot Configuration...\n");
-        print "---------------------------------\n";
-        my $dovecot = Cpanel::AdvConfig::dovecot::get_config();
-        if ( $dovecot->{'protocols'} !~ m/imap/ ) {
-            print_warn("IMAP Protocol is disabled!\n");
-        }
-        if ( $dovecot->{'disable_plaintext_auth'} !~ m/no/ ) {
-            print_warn("Allow Plaintext Authentication is enabled!\n");
-        } elsif ( $opts{verbose} ) {
-            print_info("Allow Plaintext Authentication is disabled\n");
-        }
-        print "\n";
-        return;
+    # Check Exim Configuration
+    print_bold_white("Checking Exim Configuration...\n");
+    print "------------------------------\n";
+    my %exim_localopts_conf = get_conf($EXIM_LOCALOPTS_FILE);
+    if ( $exim_localopts_conf{'allowweakciphers'} ne 0 ) {
+        print_warn("Allow weak SSL/TLS ciphers is enabled!\n");
+    }
+    elsif ( $opts{verbose} ) {
+        print_info("Allow weak SSL/TLS ciphers is disabled\n");
+    }
+    if ( $exim_localopts_conf{'require_secure_auth'} ne 1 ) {
+        print_warn("Require clients to connect with SSL or issue the STARTTLS is disabled!\n");
+    }
+    elsif ( $opts{verbose} ) {
+        print_info("Require clients to connect with SSL or issue the STARTTLS is enabled\n");
+    }
+    if ( $exim_localopts_conf{'systemfilter'} ne q{/etc/cpanel_exim_system_filter} ) {
+        print_warn("Custom System Filter File in use: $exim_localopts_conf{'systemfilter'}\n");
+    }
+    elsif ( $opts{verbose} ) {
+        print_info("System Filter File is set to the default path: $exim_localopts_conf{'systemfilter'}\n");
+    }
+    print "\n";
+
+    # Check Dovecot Configuration
+    print_bold_white("Checking Dovecot Configuration...\n");
+    print "---------------------------------\n";
+    my $dovecot = Cpanel::AdvConfig::dovecot::get_config();
+    if ( $dovecot->{'protocols'} !~ m/imap/ ) {
+        print_warn("IMAP Protocol is disabled!\n");
+    }
+    if ( $dovecot->{'disable_plaintext_auth'} !~ m/no/ ) {
+        print_warn("Allow Plaintext Authentication is enabled!\n");
+    }
+    elsif ( $opts{verbose} ) {
+        print_info("Allow Plaintext Authentication is disabled\n");
+    }
+    print "\n";
+    return;
 }
-   
 
 sub auth_check {
     my @logfiles;
@@ -192,17 +202,17 @@ sub auth_check {
     print "------------------------------------------\n";
 
     # Set logdir, ensure trailing slash, and bail if the provided logdir doesn't exist:
-    my $logdir = ($opts{logdir}) ? ($opts{logdir}) : $LOGDIR;
+    my $logdir = ( $opts{logdir} ) ? ( $opts{logdir} ) : $LOGDIR;
     $logdir =~ s@/*$@/@;
 
-    if (!-d $logdir) {
+    if ( !-d $logdir ) {
         print_warn("$opts{logdir}: No such file or directory. Skipping spam check...\n\n");
         return;
     }
- 
+
     # Collect log files
     for my $file ( grep { m/^exim_mainlog/ } @{ Cpanel::FileUtils::Dir::get_directory_nodes($logdir) } ) {
-        if ( $opts{rotated} ) { 
+        if ( $opts{rotated} ) {
             if ( ( $file =~ m/mainlog-/ ) && ( $logcount ne $ROTATED_LIMIT ) ) {
                 push @logfiles, $file;
                 $logcount++;
@@ -213,24 +223,25 @@ sub auth_check {
     print_warn("Safeguard triggered... --rotated is limited to $ROTATED_LIMIT logs\n") if ( $logcount eq $ROTATED_LIMIT );
 
     # Bail if we can't find any logs
-    return print_warn("Bailing, no exim logs found...\n\n") if (!@logfiles);
+    return print_warn("Bailing, no exim logs found...\n\n") if ( !@logfiles );
 
     # Set ionice
-    my %cpconf = get_conf( $CPANEL_CONFIG_FILE );
+    my %cpconf = get_conf($CPANEL_CONFIG_FILE);
     if ( ( !$opts{rude} ) && ( Cpanel::IONice::ionice( 'best-effort', exists $cpconf{'ionice_import_exim_data'} ? $cpconf{'ionice_import_exim_data'} : 6 ) ) ) {
-        print("Setting I/O priority to reduce system load: " . Cpanel::IONice::get_ionice() . "\n\n");
+        print( "Setting I/O priority to reduce system load: " . Cpanel::IONice::get_ionice() . "\n\n" );
         setpriority( 0, 0, 19 );
     }
 
     my $fh;
-    lOG: for my $log ( @logfiles ) {
+  lOG: for my $log (@logfiles) {
         if ( $log =~ /[.]gz$/ ) {
             my @cmd = ( qw{ gunzip -c -f }, $logdir . $log );
             if ( !open $fh, '-|', @cmd ) {
                 print_warn("Skipping $logdir/$log: Cannot open pipe to read stdout from command '@{ [ join ' ', @cmd ] }' : $!\n");
                 next LOG;
             }
-        } else {
+        }
+        else {
             if ( !open $fh, '<', $logdir . $log ) {
                 print_warn("Skipping $logdir/$log: Cannot open for reading $!\n");
                 next LOG;
@@ -238,10 +249,10 @@ sub auth_check {
         }
         while ( my $block = Cpanel::IO::read_bytes_to_end_of_line( $fh, 65_535 ) ) {
             foreach my $line ( split( m{\n}, $block ) ) {
-                push @auth_password_hits, $2 if ($line =~ $auth_password_regex);
-                push @auth_sendmail_hits, $1 if ($line =~ $auth_sendmail_regex);
-                push @auth_local_user_hits, $1 if ($line =~ $auth_local_user_regex);
-                push @subject_hits, $1 if ($line =~ $subject_regex);
+                push @auth_password_hits,   $2 if ( $line =~ $auth_password_regex );
+                push @auth_sendmail_hits,   $1 if ( $line =~ $auth_sendmail_regex );
+                push @auth_local_user_hits, $1 if ( $line =~ $auth_local_user_regex );
+                push @subject_hits,         $1 if ( $line =~ $subject_regex );
             }
         }
         close($fh);
@@ -251,51 +262,56 @@ sub auth_check {
     print_bold_white("Emails sent via Password Authentication:\n");
     if (@auth_password_hits) {
         sort_uniq(@auth_password_hits);
-    } else {
+    }
+    else {
         print "None\n";
     }
     print "\n";
     print_bold_white("Directories where email was sent via sendmail/script:\n");
     if (@auth_sendmail_hits) {
         sort_uniq(@auth_sendmail_hits);
-    } else {
+    }
+    else {
         print "None\n";
     }
     print "\n";
     print_bold_white("Users who sent mail via local SMTP:\n");
     if (@auth_local_user_hits) {
         sort_uniq(@auth_local_user_hits);
-    } else {
+    }
+    else {
         print "None\n";
     }
     print "\n";
     print_bold_white("Subjects by commonality:\n");
     sort_uniq(@subject_hits);
     print "\n";
- 
+
     return;
 }
 
 sub print_exim_queue {
+
     # Print exim queue length
     print_bold_white("Exim Queue: ");
     my $queue = get_exim_queue();
-    if ($queue >= 1000) {
+    if ( $queue >= 1000 ) {
         print_bold_red("$queue\n");
-    } else {
+    }
+    else {
         print_bold_green("$queue\n");
     }
     return;
 }
 
 sub get_exim_queue {
-    my $queue = timed_run_trap_stderr( 10, 'exim', '-bpc');
+    my $queue = timed_run_trap_stderr( 10, 'exim', '-bpc' );
     return $queue;
-    }
+}
 
 sub rbl_check {
     my $rbls = shift;
-    my @rbls = split( /,/, $rbls);
+    my @rbls = split( /,/, $rbls );
     my @ips;
 
     # Fetch IP's... should we only check mailips? this is more thorough...
@@ -306,33 +322,35 @@ sub rbl_check {
     # push @$ips, qw{ 127.0.0.2 };
 
     # In cPanel 11.84, we switched to the libunbound resolver
-    my ($cp_numeric_version, $cp_original_version) = get_cpanel_version();
-    my $libunbound = (version_compare($cp_numeric_version, qw( < 11.84))) ? 0 : 1;
+    my ( $cp_numeric_version, $cp_original_version ) = get_cpanel_version();
+    my $libunbound = ( version_compare( $cp_numeric_version, qw( < 11.84) ) ) ? 0 : 1;
 
     # If "all" is found in the --rbl arg, ignore rest, use default rbl list
     # maybe we should append so that user can specify all and ones which are not included in the list?
-    @rbls = @RBLS if (grep { /\ball\b/i } @rbls);
+    @rbls = @RBLS if ( grep { /\ball\b/i } @rbls );
     print_bold_white("Checking IP's against RBL's...\n");
     print "------------------------------\n";
 
     foreach my $ip (@$ips) {
         print "$ip:\n";
-        my $ip_rev = join('.', reverse split('\.', $ip));
+        my $ip_rev = join( '.', reverse split( '\.', $ip ) );
         foreach my $rbl (@rbls) {
-            printf("\t%-25s ", $rbl);
+            printf( "\t%-25s ", $rbl );
 
             my $result;
             if ($libunbound) {
-                $result = dns_query("$ip_rev.$rbl", 'A')->[0] || 0;
-            } else {
+                $result = dns_query( "$ip_rev.$rbl", 'A' )->[0] || 0;
+            }
+            else {
                 # This uses libunbound, which will return an aref, but we can always expect just one result here
-                $result = dns_query_pre_84("$ip_rev.$rbl", 'A') || 0;
+                $result = dns_query_pre_84( "$ip_rev.$rbl", 'A' ) || 0;
             }
 
             if ( $result =~ /\A 127\.0\.0\./xms ) {
-                 print_bold_red("LISTED\n");
-            } else {
-                 print_bold_green("GOOD\n");
+                print_bold_red("LISTED\n");
+            }
+            else {
+                print_bold_green("GOOD\n");
             }
         }
         print "\n";
@@ -358,10 +376,10 @@ sub maillog_check {
 
     # General
     my @out_of_memory;
-    my $out_of_memory_regex     = qr{lmtp\(([\w\.@]+)\): Fatal: \S+: Out of memory};
+    my $out_of_memory_regex = qr{lmtp\(([\w\.@]+)\): Fatal: \S+: Out of memory};
 
-    my $time_backwards          = 0;
-    my $time_backwards_regex    = qr{Fatal: Time just moved backwards by \d+ \w+\. This might cause a lot of problems, so I'll just kill myself now};
+    my $time_backwards       = 0;
+    my $time_backwards_regex = qr{Fatal: Time just moved backwards by \d+ \w+\. This might cause a lot of problems, so I'll just kill myself now};
 
     # Quota errors
     my @quota_failed;
@@ -376,8 +394,8 @@ sub maillog_check {
     my $unrec_code_regex        = qr{quota-fs: (unrecognized status code .+)};
 
     # Spamd error
-    my $pyzor_timeout           = 0;
-    my $pyzor_timeout_regex     = qr{Timeout: Did not receive a response from the pyzor server public\.pyzor\.org};
+    my $pyzor_timeout       = 0;
+    my $pyzor_timeout_regex = qr{Timeout: Did not receive a response from the pyzor server public\.pyzor\.org};
 
     my $pyzor_unreachable       = 0;
     my $pyzor_unreachable_regex = qr{pyzor: check failed: Cannot connect to public.pyzor.org:24441: IO::Socket::INET: connect: Network is unreachable};
@@ -386,10 +404,10 @@ sub maillog_check {
     print "-----------------------------------------\n";
 
     # Set logdir, ensure trailing slash, and bail if the provided logdir doesn't exist:
-    my $logdir = ($opts{logdir}) ? ($opts{logdir}) : $LOGDIR;
+    my $logdir = ( $opts{logdir} ) ? ( $opts{logdir} ) : $LOGDIR;
     $logdir =~ s@/*$@/@;
 
-    if (!-d $logdir) {
+    if ( !-d $logdir ) {
         print_warn("$opts{logdir}: No such file or directory. Skipping spam check...\n\n");
         return;
     }
@@ -407,24 +425,25 @@ sub maillog_check {
     print_warn("Safeguard triggered... --rotated is limited to $ROTATED_LIMIT logs\n") if ( $logcount eq $ROTATED_LIMIT );
 
     # Bail if we can't find any logs
-    return print_warn("Bailing, no maillog found...\n\n") if (!@logfiles);
+    return print_warn("Bailing, no maillog found...\n\n") if ( !@logfiles );
 
     # Set ionice
-    my %cpconf = get_conf( $CPANEL_CONFIG_FILE );
+    my %cpconf = get_conf($CPANEL_CONFIG_FILE);
     if ( ( !$opts{rude} ) && ( Cpanel::IONice::ionice( 'best-effort', exists $cpconf{'ionice_import_exim_data'} ? $cpconf{'ionice_import_exim_data'} : 6 ) ) ) {
-        print("Setting I/O priority to reduce system load: " . Cpanel::IONice::get_ionice() . "\n\n");
+        print( "Setting I/O priority to reduce system load: " . Cpanel::IONice::get_ionice() . "\n\n" );
         setpriority( 0, 0, 19 );
     }
 
     my $fh;
-    lOG: for my $log ( @logfiles ) {
+  lOG: for my $log (@logfiles) {
         if ( $log =~ /[.]gz$/ ) {
             my @cmd = ( qw{ gunzip -c -f }, $logdir . $log );
             if ( !open $fh, '-|', @cmd ) {
                 print_warn("Skipping $logdir/$log: Cannot open pipe to read stdout from command '@{ [ join ' ', @cmd ] }' : $!\n");
                 next LOG;
             }
-        } else {
+        }
+        else {
             if ( !open $fh, '<', $logdir . $log ) {
                 print_warn("Skipping $logdir/$log: Cannot open for reading $!\n");
                 next LOG;
@@ -432,9 +451,9 @@ sub maillog_check {
         }
         while ( my $block = Cpanel::IO::read_bytes_to_end_of_line( $fh, 65_535 ) ) {
             foreach my $line ( split( m{\n}, $block ) ) {
-                push @out_of_memory, $1 if ($line =~ $out_of_memory_regex);
-                push @quota_failed, $1 if ($line =~ $quotactl_failed_regex);
-                ++$pyzor_timeout if ($line =~ $pyzor_timeout_regex);
+                push @out_of_memory, $1 if ( $line =~ $out_of_memory_regex );
+                push @quota_failed,  $1 if ( $line =~ $quotactl_failed_regex );
+                ++$pyzor_timeout if ( $line =~ $pyzor_timeout_regex );
             }
         }
         close($fh);
@@ -444,21 +463,24 @@ sub maillog_check {
     print_bold_white("LMTP quota issues:\n");
     if (@quota_failed) {
         sort_uniq(@quota_failed);
-    } else {
+    }
+    else {
         print "None\n";
     }
     print "\n";
     print_bold_white("Email accounts triggering LMTP Out of memory:\n");
     if (@out_of_memory) {
         sort_uniq(@out_of_memory);
-    } else {
+    }
+    else {
         print "None\n";
     }
     print "\n";
     print_bold_white("Timeouts to public.pyzor.org:24441:\n");
-    if ($pyzor_timeout ne 0) {
+    if ( $pyzor_timeout ne 0 ) {
         print "Pyzor timed out $pyzor_timeout times\n";
-    } else {
+    }
+    else {
         print "None\n";
     }
     print "\n";
@@ -467,6 +489,7 @@ sub maillog_check {
 }
 
 sub version_compare {
+
     # example: return if version_compare($ver_string, qw( >= 1.2.3.3 ));
     # Must be no more than four version numbers separated by periods and/or underscores.
     my ( $ver1, $mode, $ver2 ) = @_;
@@ -500,8 +523,8 @@ sub version_compare {
 
 sub _version_cmp {
     my ( $first, $second ) = @_;
-    my ( $a1, $b1, $c1, $d1 ) = split /[\._]/, $first;
-    my ( $a2, $b2, $c2, $d2 ) = split /[\._]/, $second;
+    my ( $a1,    $b1, $c1, $d1 ) = split /[\._]/, $first;
+    my ( $a2,    $b2, $c2, $d2 ) = split /[\._]/, $second;
     for my $ref ( \$a1, \$b1, \$c1, \$d1, \$a2, \$b2, \$c2, \$d2, ) {    # Fill empties with 0
         $$ref = 0 unless defined $$ref;
     }
@@ -550,7 +573,7 @@ sub get_ips {
 }
 
 sub dns_query_pre_84 {
-    my ($name, $type) = @_;
+    my ( $name, $type ) = @_;
 
     return if !load_module_with_fallbacks(
         'needed_subs'  => [qw{new recursive_query}],
@@ -558,13 +581,13 @@ sub dns_query_pre_84 {
         'fail_warning' => 'can\'t load Cpanel::DnsRoots::Resolver',
     );
 
-    my $dns   = Cpanel::DnsRoots::Resolver->new();
+    my $dns = Cpanel::DnsRoots::Resolver->new();
     my ($res) = $dns->recursive_query( $name, $type );
     return $res;
 }
 
 sub dns_query {
-    my($name, $type) = @_;
+    my ( $name, $type ) = @_;
 
     return if !load_module_with_fallbacks(
         'needed_subs'  => [qw{new recursive_queries}],
@@ -572,7 +595,7 @@ sub dns_query {
         'fail_warning' => 'can\'t load Cpanel::DNS::Unbound',
     );
 
-    my $dns   = Cpanel::DNS::Unbound->new();
+    my $dns = Cpanel::DNS::Unbound->new();
     my ($res) = $dns->recursive_queries( [ [ $name, $type ] ] )->[0];
     return $res->{'decoded_data'} || $res->{result}{data};
 }
@@ -581,15 +604,16 @@ sub sort_uniq {
     my @input = @_;
     my %count;
     my $line = 1;
-    $opts{limit} //= $LIMIT;
+    $opts{limit}     //= $LIMIT;
     $opts{threshold} //= $THRESHOLD;
-    foreach ( @input ) { $count{$_}++; }
+    foreach (@input) { $count{$_}++; }
     for ( sort { $count{$b} <=> $count{$a} } keys %count ) {
         if ( $line ne $opts{limit} ) {
-            printf ("%7d %s\n", "$count{$_}", "$_") if ( $count{$_} >= $opts{threshold} );
+            printf( "%7d %s\n", "$count{$_}", "$_" ) if ( $count{$_} >= $opts{threshold} );
             $line++;
-        } else { 
-            printf( "%7d %s\n", "$count{$_}", "$_") if ( $count{$_} >= $opts{threshold} );
+        }
+        else {
+            printf( "%7d %s\n", "$count{$_}", "$_" ) if ( $count{$_} >= $opts{threshold} );
             last;
         }
     }
@@ -605,7 +629,8 @@ sub get_conf {
         %cpconf = map { ( split( /=/, $_, 2 ) )[ 0, 1 ] } split( /\n/, readline($cpconf_fh) );
         close $cpconf_fh;
         return %cpconf;
-    } else {
+    }
+    else {
         print_warn("Could not open file: $conf\n");
     }
     return;
@@ -630,7 +655,7 @@ sub _timedsaferun {    # Borrowed from WHM 66 Cpanel::SafeRun::Timed and modifie
     my $fh;                                          # FB-63723: must declare $fh before eval block in order to avoid unwanted implicit waitpid on die
     eval {
         local $SIG{'__DIE__'} = 'DEFAULT';
-        local $SIG{'ALRM'} = sub { $output = ''; print RED ON_BLACK 'Timeout while executing: ' . join( ' ', @PROGA ) . "\n"; die; };
+        local $SIG{'ALRM'}    = sub { $output = ''; print RED ON_BLACK 'Timeout while executing: ' . join( ' ', @PROGA ) . "\n"; die; };
         alarm($timer);
         if ( $pid = open( $fh, '-|' ) ) {            ## no critic (BriefOpen)
             local $/;
@@ -645,7 +670,7 @@ sub _timedsaferun {    # Borrowed from WHM 66 Cpanel::SafeRun::Timed and modifie
             else {
                 open( STDERR, '>', '/dev/null' );    ## no critic (BriefOpen)
             }
-            exec(@PROGA) or exit 1;
+            exec(@PROGA) or exit 1;                  ## no critic (NoExitsFromSubroutines)
         }
         else {
             print RED ON_BLACK 'Error while executing: [ ' . join( ' ', @PROGA ) . ' ]: ' . $! . "\n";
@@ -657,9 +682,9 @@ sub _timedsaferun {    # Borrowed from WHM 66 Cpanel::SafeRun::Timed and modifie
     };
     alarm 0;
     if ( !$complete && $pid && $pid > 0 ) {
-        kill( 15, $pid );    #TERM
-        sleep(2);            # Give the process a chance to die 'nicely'
-        kill( 9, $pid );     #KILL
+        kill( 15, $pid );                            #TERM
+        sleep(2);                                    # Give the process a chance to die 'nicely'
+        kill( 9, $pid );                             #KILL
     }
     return defined $output ? $output : '';
 }
@@ -704,7 +729,7 @@ sub load_module_with_fallbacks {
     if ( !$namespace_loaded ) {
         if ( !$opts{'fallback'} || ref $opts{'fallback'} != 'CODE' ) {
             print_warn( 'Missing Perl Module(s): ' . join( ', ', @{ $opts{'modules'} } ) . ' -- ' . $opts{'fail_warning'} . " -- Try using /usr/local/cpanel/3rdparty/bin/perl?\n" ) if $opts{'fail_warning'};
-            die "Stopping here." if $opts{'fail_fatal'};
+            die "Stopping here."                                                                                                                                                     if $opts{'fail_fatal'};
         }
         else {
             $opts{'fallback'}->();
