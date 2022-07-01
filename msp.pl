@@ -3,7 +3,10 @@ package MSP;
 
 use strict;
 use warnings;
-
+use Cpanel::SafeRun::Timed ();
+use Cpanel::JSON           ();
+use JSON::MaybeXS qw(encode_json decode_json);
+use Sys::Hostname;
 use Getopt::Long;
 use Cpanel::AdvConfig::dovecot ();
 use Cpanel::FileUtils::Dir     ();
@@ -11,9 +14,11 @@ use Cpanel::IONice             ();
 use Cpanel::IO                 ();
 use Term::ANSIColor qw{:constants};
 $Term::ANSIColor::AUTORESET = 1;
+use POSIX;
+use File::Find;
 
 # Variables
-our $VERSION = '2.1';
+our $VERSION = '2.2';
 
 our $LOGDIR              = q{/var/log/};
 our $CPANEL_CONFIG_FILE  = q{/var/cpanel/cpanel.config};
@@ -31,6 +36,12 @@ our @RBLS = qw{ b.barracudacentral.org
   zen.spamhaus.org
 };
 
+my $sent;
+my $blacklists;
+my $hostname           = hostname;
+my @local_ipaddrs_list = get_local_ipaddrs();
+get_local_ipaddrs();
+
 # Initialize
 our $LIMIT         = 10;
 our $THRESHOLD     = 1;
@@ -39,7 +50,7 @@ our $OPT_TIMEOUT;
 
 # Options
 my %opts;
-my ( $all, $auth, $conf, $forwards, $help, $limit, $logdir, $queue, @rbl, $rbllist, $rotated, $rude, $threshold, $verbose );
+my ( $all, $auth, $conf, $forwards, $help, $limit, $logdir, $queue, @rbl, $rbllist, $rotated, $rude, $threshold, $verbose, $domain, $email );
 GetOptions(
     \%opts,
     'all',
@@ -56,58 +67,73 @@ GetOptions(
     'rotated',
     'rude',
     'threshold=i{1}',
-    'verbose'
+    'verbose',
+    'domain=s' => \$domain,
+    'email:s'  => \$email,,
 ) or die("Please see --help\n");
 
 # Make this a modulino
 __PACKAGE__->main(@ARGV) unless caller();
 1;
 
+if ($domain) {    ## --domain{
+    hostname_check();
+    domain_exist();
+    domain_filters();
+    check_local_or_remote();
+    mx_check();
+    mx_consistency($domain);
+    domain_resolv();
+    check_spf();
+    check_dkim();
+}
+
+if ($email) {
+    if ( $email =~ /^([a-zA-Z0-9_\-\.]+)@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.)|(([a-zA-Z0-9\-]+\.)+))([a-zA-Z]{2,4}|[0-9]{1,3})(\]?)$/ ) {
+        do_email($email);
+        email_valiases($email);
+        is_exim_running();
+        check_closed_ports();
+        mx_consistency($email);
+    }
+    else {
+        die "Please enter a valid email address\n";
+    }
+}
+
 sub print_help {
     print BOLD BRIGHT_BLUE ON_BLACK "[MSP-$VERSION] ";
     print BOLD WHITE ON_BLACK "Mail Status Probe: Mail authentication statistics and configuration checker\n";
     print "Usage: ./msp.pl --auth --rotated --rude\n";
     print "       ./msp.pl --conf --rbl [all|bl.spamcop.net,zen.spamhaus.org]\n\n";
-    printf( "\t%-15s %s\n", "--help", "print this help message" );
-
-    #    printf( "\t%-15s %s\n", "--all", "run all checks");
-    printf( "\t%-15s %s\n", "--auth", "print mail authentication statistics" );
-    printf( "\t%-15s %s\n", "--conf", "print mail configuration info (e.g. require_secure_auth, smtpmailgidonly, etc.)" );
-
-    #    printf( "\t%-15s %s\n", "--forwards", "print forward relay statistics");
-    #    printf( "\t%-15s %s\n", "--ignore", "ignore common statistics (e.g. cwd=/var/spool/exim)");
-    printf( "\t%-15s %s\n", "--limit",   "limit statistics checks to n results (defaults to 10, set to 0 for no limit)" );
-    printf( "\t%-15s %s\n", "--logdir",  "specify an alternative logging directory, (defaults to /var/log)" );
-    printf( "\t%-15s %s\n", "--maillog", "check maillog for common errors" );
-    printf( "\t%-15s %s\n", "--queue",   "print exim queue length" );
-
-    #    printf( "\t%-15s %s\n", "--quiet", "only print alarming information or statistics (requires --threshold)");
-    printf( "\t%-15s %s\n", "--rbl",       "check IP's against provided blacklists(comma delimited)" );
-    printf( "\t%-15s %s\n", "--rbllist",   "list available RBL's" );
-    printf( "\t%-15s %s\n", "--rotated",   "check rotated exim logs" );
-    printf( "\t%-15s %s\n", "--rude",      "forgo nice/ionice settings" );
-    printf( "\t%-15s %s\n", "--threshold", "limit statistics output to n threshold(defaults to 1)" );
-    printf( "\t%-15s %s\n", "--verbose",   "display all information" );
+    printf( "\t%-15s %s\n", "--help",          "print this help message" );
+    printf( "\t%-15s %s\n", "--auth",          "print mail authentication statistics" );
+    printf( "\t%-15s %s\n", "--conf",          "print mail configuration info (e.g. require_secure_auth, smtpmailgidonly, etc.)" );
+    printf( "\t%-15s %s\n", "--limit",         "limit statistics checks to n results (defaults to 10, set to 0 for no limit)" );
+    printf( "\t%-15s %s\n", "--logdir",        "specify an alternative logging directory, (defaults to /var/log)" );
+    printf( "\t%-15s %s\n", "--maillog",       "check maillog for common errors" );
+    printf( "\t%-15s %s\n", "--queue",         "print exim queue length" );
+    printf( "\t%-15s %s\n", "--rbl",           "check IP's against provided blacklists(comma delimited)" );
+    printf( "\t%-15s %s\n", "--rbllist",       "list available RBL's" );
+    printf( "\t%-15s %s\n", "--rotated",       "check rotated exim logs" );
+    printf( "\t%-15s %s\n", "--rude",          "forgo nice/ionice settings" );
+    printf( "\t%-15s %s\n", "--threshold",     "limit statistics output to n threshold(defaults to 1)" );
+    printf( "\t%-15s %s\n", "--verbose",       "display all information" );
+    printf( "\t%-15s %s\n", "--domain=DOMAIN", "Check for domain's existence, ownership and resolution on the server." );
+    printf( "\t%-15s %s\n", "--email=EMAIL",   "Email specific checks." );
     print "\n";
     exit;    ## no critic (NoExitsFromSubroutines)
 }
 
 sub main {
     die "MSP must be run as root\n" if ( $< != 0 );
-
-    print_help() if ( ( !%opts ) || ( $opts{help} ) );
-
-    conf_check() if ( $opts{conf} );
-
-    print_exim_queue() if ( $opts{queue} );
-
-    auth_check() if ( $opts{auth} );
-
-    maillog_check() if ( $opts{maillog} );
-
-    rbl_list() if ( $opts{rbllist} );
-
-    rbl_check( $opts{rbl} ) if ( $opts{rbl} );
+    print_help()                    if ( $opts{help} );
+    conf_check()                    if ( $opts{conf} );
+    print_exim_queue()              if ( $opts{queue} );
+    auth_check()                    if ( $opts{auth} );
+    maillog_check()                 if ( $opts{maillog} );
+    rbl_list()                      if ( $opts{rbllist} );
+    rbl_check( $opts{rbl} )         if ( $opts{rbl} );
     return;
 }
 
@@ -249,6 +275,7 @@ sub auth_check {
         }
         while ( my $block = Cpanel::IO::read_bytes_to_end_of_line( $fh, 65_535 ) ) {
             foreach my $line ( split( m{\n}, $block ) ) {
+                next if ( $line =~ m{__cpanel__service__auth__icontact__} );
                 push @auth_password_hits,   $2 if ( $line =~ $auth_password_regex );
                 push @auth_sendmail_hits,   $1 if ( $line =~ $auth_sendmail_regex );
                 push @auth_local_user_hits, $1 if ( $line =~ $auth_local_user_regex );
@@ -764,7 +791,7 @@ sub print_std {
     my $text = shift // '';
     return if $text eq '';
 
-    print BOLD BRIGHT_BLUE ON_BLACK '[MSP]  * ';
+    print BOLD BRIGHT_BLUE ON_BLACK ' * ';
     print BOLD WHITE ON_BLACK "$text";
     return;
 }
@@ -792,3 +819,587 @@ sub print_bold_green {
     print BOLD GREEN ON_BLACK "$text";
     return;
 }
+
+sub hostname_check {
+    if ( $hostname eq $domain ) {
+        print_warn("[WARN] * Your hostname $hostname appears to be the same as $domain.  Was this intentional?\n");
+    }
+}
+
+sub domain_exist {
+    open( USERDOMAINS, "/etc/userdomains" );
+    while (<USERDOMAINS>) {
+        if (/^$domain: (\S+)/i) {
+            my $user = $1;
+            print_info("The domain $domain is owned by $user.\n");
+            my $suspchk = "/var/cpanel/suspended/$user";
+            if ( -e $suspchk ) {
+                print_warn("[WARN] * The user $user is SUSPENDED.\n");
+            }
+            return;
+        }
+    }
+    print_warn("[WARN] * The domain $domain DOES NOT exist on this server.\n");
+    close(USERDOMAINS);
+}
+
+sub domain_filters {
+    print_warn("The virtual filter for $domain is NOT empty (/etc/vfilters/$domain).\n") if -s "/etc/vfilters/$domain";
+}
+
+sub check_local_or_remote {
+
+    open my $loc_domain, '<', '/etc/localdomains';
+    while (<$loc_domain>) {
+        if (/^${domain}$/) {
+            print_info("$domain is in LOCALDOMAINS.\n");
+        }
+    }
+    close $loc_domain;
+
+    open my $remote_domain, '<', '/etc/remotedomains';
+    while (<$remote_domain>) {
+        if (/^${domain}$/) {
+            print_info("[INFO] *");
+            print_std(" $domain is in REMOTEDOMAINS.\n");
+            last;
+        }
+    }
+    close $remote_domain;
+}
+
+sub mx_check {
+    my @mx_record = qx/dig mx $domain +short/;
+    chomp(@mx_record);
+    my @dig_mx_ip;
+
+    foreach my $mx_record (@mx_record) {
+        my $dig_mx_ip = qx/dig $mx_record +short/;
+        push( @dig_mx_ip, $dig_mx_ip );
+        chomp(@dig_mx_ip);
+
+    }
+
+    foreach my $mx_record (@mx_record) {
+        print_info("\t \\_ MX Record: $mx_record\n");
+    }
+    foreach (@mx_record) {
+        print_info( "\t\t \\_ " . qx/dig $_ +short/ );
+
+    }
+}
+
+sub domain_resolv {
+    my $domain_ip;
+    chomp( $domain_ip = run( 'dig', $domain, '@8.8.4.4', '+short' ) );
+    if ( grep { $_ eq $domain_ip } @local_ipaddrs_list ) {
+        print_info("The domain $domain resolves to IP: \n\t \\_ $domain_ip\n");
+        return;
+    }
+    elsif ( ( !defined $domain_ip ) || ( $domain_ip eq '' ) ) {
+        print_warn("Domain did not return an A record.  It is likely not registered or not pointed to any IP\n");
+    }
+    else {
+        print_warn("The domain $domain DOES NOT resolve to this server.\n");
+        print_warn("\t\\_ It currently resolves to:      $domain_ip \n");
+    }
+
+    sub check_blacklists {
+
+        # Way more lists out there, but I'll add them later.
+        my %list = (
+            'sbl-xbl.spamhaus.org'        => 'Spamhaus',
+            'pbl.spamhaus.org'            => 'Spamhaus',
+            'sbl.spamhaus.org'            => 'Spamhaus',
+            'bl.spamcop.net'              => 'SpamCop',
+            'dsn.rfc-ignorant.org'        => 'Rfc-ignorant.org',
+            'postmaster.rfc-ignorant.org' => 'Rfc.ignorant.org',
+            'abuse.rfc-ignorant.org'      => 'Rfc.ignorant.org',
+            'whois.rfc-ignorant.org'      => 'Rfc.ignorant.org',
+            'ipwhois.rfc-ignorant.org'    => 'Rfc.ignorant.org',
+            'bogusmx.rfc-ignorant.org'    => 'Rfc.ignorant.org',
+            'dnsbl.sorbs.net'             => 'Sorbs',
+            'badconf.rhsbl.sorbs.net'     => 'Sorbs',
+            'nomail.rhsbl.sorbs.net'      => 'Sorbs',
+            'cbl.abuseat.org'             => 'Abuseat.org',
+            'relays.visi.com'             => 'Visi.com',
+            'zen.spamhaus.org'            => 'Spamhaus',
+            'bl.spamcannibal.org'         => 'Spamcannibal',
+            'ubl.unsubscore.com'          => 'LashBack',
+            'b.barracudacentral.org'      => 'Barracuda',
+        );
+
+        # Grab the mail addresses
+
+        my @files = qw(/var/cpanel/mainip /etc/mailips);
+
+        my @ips = '';
+        my $lines;
+        my $reverse_lines;
+        my @reverse_ips = '';
+        foreach my $files (@files) {
+            open FILE, "$files";
+            while ( $lines = <FILE> ) {
+                if ( $lines =~ m/([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})/ ) {
+                    $lines         = "$1\.$2\.$3\.$4";
+                    $reverse_lines = "$4\.$3\.$2\.$1";
+                    chomp $lines;
+                    chomp $reverse_lines;
+                    push @ips,         $lines;
+                    push @reverse_ips, $reverse_lines;
+                }
+            }
+            close FILE;
+        }
+
+        shift @ips;
+
+        print_info("[INFO] * ");
+        print_std("Checking Blacklists:\n");
+
+        foreach my $reverse_ip (@reverse_ips) {
+            my $ip = shift @ips;
+            my $key;
+            my $value;
+            while ( ( $key, $value ) = each %list ) {
+                my $host = "$reverse_ip.$key\n";
+                chomp($host);
+                my $ret    = run( "host", "$host" );
+                my $ret2   = grep( /(NXDOMAIN|SERVFAIL)/, $ret );
+                my $status = $ret2 ? "not listed" : "is listed";
+                if ( $status eq 'not listed' ) {
+                    print "";
+                }
+                else {
+                    print_warn("\t\\_");
+                    print_std(" $ip ");
+                    print_warn("$status on $value\n");
+                }
+            }
+        }
+
+        sub check_spf {
+            my @check = qx/dig $domain TXT/;
+            if ( grep ( m/.*spf.*/, @check ) ) {
+                print_info("$domain has the folloiwng SPF records:\n");
+                foreach my $check (@check) {
+                    if ( $check =~ m/.*spf.*/ ) {
+                        print_std("\t\\_ $check");
+                    }
+                }
+            }
+            else {
+                return;
+            }
+        }
+
+        sub check_dkim {
+            my @check_dkim = qx/dig default._domainkey.$domain TXT +short/;
+            if (@check_dkim) {
+                foreach my $check_dkim (@check_dkim) {
+                    print_info("$domain has the following domain keys:\n ");
+                    print_std("\t\\_ $check_dkim");
+
+                }
+            }
+
+            else {
+                print_warn("[WARN] * Domain does not have a DKIM record\n");
+            }
+        }
+
+        sub sent_email {
+            open FILE, "/var/log/exim_mainlog";
+
+            print_warn("\nEmails by user: ");
+            print "\n\n";
+            our @system_users = "";
+
+            while ( my $lines_users = <FILE> ) {
+                if ( $lines_users =~ /(U\=)(.+?)(\sP\=)/i ) {
+                    my $line_users = $2;
+                    push( @system_users, $line_users );
+                }
+            }
+            my %count;
+            $count{$_}++ foreach @system_users;
+            while ( my ( $key, $value ) = each(%count) ) {
+                if ( $key =~ /^$/ ) {
+                    delete( $count{$key} );
+                }
+            }
+
+            foreach my $value (
+                reverse sort { $count{$a} <=> $count{$b} }
+                keys %count
+            ) {
+                print " " . $count{$value} . " : " . $value . "\n";
+            }
+
+            print "\n\n";
+            print "===================\n";
+            print " Total:  " . scalar( @system_users - 1 );
+            print "\n===================\n";
+
+            print_warn("\nEmail accounts sending out mail:\n\n");
+
+            open FILE, "/var/log/exim_mainlog";
+            my @email_users = '';
+            while ( my $lines_email = <FILE> ) {
+                if ( $lines_email =~ /(_login:|_plain:)(.+?)(\sS=)/i ) {
+                    my $lines_emails = $2;
+                    push( @email_users, $lines_emails );
+                }
+            }
+            my %email_count;
+            $email_count{$_}++ foreach @email_users;
+            while ( my ( $key, $value ) = each(%email_count) ) {
+                if ( $key =~ /^$/ ) {
+                    delete( $email_count{$key} );
+                }
+            }
+
+            foreach my $value (
+                reverse sort { $email_count{$a} <=> $email_count{$b} }
+                keys %email_count
+            ) {
+                print " " . $email_count{$value} . " : " . $value . "\n";
+            }
+
+            print "\n";
+            print "===================\n";
+            print "Total: " . scalar(@email_users);
+            print "\n===================\n";
+
+## Section for current working directories
+
+            print_warn("\nDirectories mail is originating from:\n\n\n");
+
+            open FILE, "/var/log/exim_mainlog";
+            my @dirs;
+            my $dirs;
+
+            while ( $dirs = <FILE> ) {
+                if ( ( $dirs =~ /(cwd=)(.+?)(\s)/i ) && ( $dirs !~ /(cwd=\/.+?exim)/i ) && ( $dirs !~ /(cwd=.+?       CronDaemon)/i ) && ( $dirs !~ /(cwd=\/etc\/csf)/i ) && ( $dirs !~ /cwd=\/\s/i ) ) {
+                    my $dir = $2;
+                    push( @dirs, $dir );
+                }
+            }
+            my %dirs;
+            $dirs{$_}++ foreach @dirs;
+            while ( my ( $key, $value ) = each(%dirs) ) {
+                if ( $key =~ /^$/ ) {
+                    delete( $dirs[$key] );
+                }
+            }
+
+            while ( my ( $key, $value ) = each(%dirs) ) {
+                if ( $key =~ /^$/ ) {
+                    delete( $dirs{$key} );
+                }
+            }
+
+            foreach my $value ( reverse sort { $dirs{$a} <=> $dirs{$b} } keys %dirs ) {
+                print " " . $dirs{$value} . " : " . $value . "\n";
+            }
+
+            print "\n";
+            print "===================\n";
+            if ( @dirs < 1 ) {
+                print "Total: " . @dirs;
+            }
+            else {
+                print "Total: " . scalar( @dirs - 1 );
+            }
+            print "\n===================\n";
+
+            print_warn("\nTop 20 Email Titles:\n\n\n");
+
+            open FILE, "/var/log/exim_mainlog";
+            my @titles;
+
+            while ( my $titles = <FILE> ) {
+                if ( $titles =~ /((U=|_login:).+)((?<=T=\").+?(?=\"))(.+$)/i ) {
+                    my $title = $3;
+                    push( @titles, $title );
+                }
+            }
+            our %titlecount;
+            my @titlecount;
+            $titlecount{$_}++ foreach @titles;
+            while ( my ( $key, $value ) = each(%titlecount) ) {
+                if ( $key =~ /^$/ ) {
+                    delete( $titlecount[$key] );
+                }
+            }
+
+            my $limit = 20;
+            my $loops = 0;
+            foreach my $value (
+                reverse sort { $titlecount{$a} <=> $titlecount{$b} }
+                keys %titlecount
+            ) {
+                print " " . $titlecount{$value} . " : " . $value . "\n";
+                $loops++;
+                if ( $loops >= $limit ) {
+                    last;
+                }
+            }
+            print "\n\n";
+            print "===================\n";
+            print "Total: " . scalar( @titles - 1 );
+            print "\n===================\n\n";
+
+            close FILE;
+        }
+    }
+}
+
+sub get_local_ipaddrs {    ## Ripped from SSP as well.  Likely less gratuitous, but will likely drop the use of run() in the future cuz IPC.
+    my @ifconfig = split /\n/, run( 'ifconfig', '-a' );
+    for my $line (@ifconfig) {
+        if ( $line =~ m{ (\d+\.\d+\.\d+\.\d+) }xms ) {
+            my $ipaddr = $1;
+            unless ( $ipaddr =~ m{ \A 127\. }xms ) {
+                push @local_ipaddrs_list, $ipaddr;
+            }
+        }
+    }
+    return @local_ipaddrs_list;
+}
+
+sub run {    #Directly ripped run() from SSP; likely more gratuitous than what is actually needed.  Remember to look into IPC::Run.
+
+    my $cmdline = \@_;
+    my $output;
+    local ($/);
+    my ( $pid, $prog_fh );
+    if ( $pid = open( $prog_fh, '-|' ) ) {
+
+    }
+    else {
+        open STDERR, '>', '/dev/null';
+        ( $ENV{'PATH'} ) = $ENV{'PATH'} =~ m/(.*)/;
+        exec(@$cmdline);
+        exit(127);
+    }
+
+    if ( !$prog_fh || !$pid ) {
+        $? = -1;
+        return \$output;
+    }
+    $output = readline($prog_fh);
+    close($prog_fh);
+    return $output;
+}
+
+#sub mx_consistency {
+#    my $main_ip = qx/hostname -i/;
+#    chomp($main_ip);
+#    my @mxcheck_local  = qx/dig mx \@$main_ip $domain +short/;
+#    my @mxcheck_remote = qx/dig mx \@8.8.8.8 $domain +short/;
+#    if ( @mxcheck_local eq @mxcheck_remote ) {
+#        print_info("[INFO]  Remote and local MX lookups match\n");
+#        foreach (@mxcheck_local) {
+#            print_bold_white("\t\\_ Local MX: $domain IN MX $_");
+#        }
+#        print "\n";
+#        foreach (@mxcheck_remote) {
+#            print_info("\t\\_ Remote MX: $domain IN MX $_");
+#        }
+#    }
+#    else {
+#        print_warn("[WARN] * Local MX does not match remote MX\n ");
+#        foreach (@mxcheck_local) {
+#            print_bold_white("\t\\_ Local MX: $domain IN MX $_");
+#        }
+#        print "\n";
+#        foreach (@mxcheck_remote) {
+#            print_bold_white("\t\\_ Remote MX: $domain IN MX $_");
+#        }
+#    }
+#}
+
+sub does_email_exist {
+    my $tcEmail = shift;
+    my ( $localpart, $domain ) = $tcEmail =~ /(.*)@(.*)/;
+    my $DataJSON     = get_whmapi1( 'getdomainowner', "domain=$domain" );
+    my $cpUser       = $DataJSON->{data}->{user};
+    my $ListPopsJSON = get_uapi( 'Email', 'list_pops', "--user=$cpUser" );
+    for my $EmailPop ( @{ $ListPopsJSON->{result}->{data} } ) {
+        if ( $EmailPop->{email} eq $tcEmail ) {
+            print_info("[INFO] Email address $tcEmail exists.\n");
+            return;
+        }
+    }
+    print_warn("[WARN] * $tcEmail doesn't seem to exist on this server.\n ");
+    return;
+}
+
+sub get_doc_root {
+
+    # REDO THIS!!!
+    my ( $user, $domain ) = $email =~ /(.*)@(.*)/;
+    my $DomainInfoJSON = get_whmapi1('get_domain_info');
+    my $DomainInfoLines;
+    my $maindocroot;
+    for $DomainInfoLines ( @{ $DomainInfoJSON->{data}->{domains} } ) {
+        if ( $DomainInfoLines->{domain} eq $domain ) {
+            if ( $DomainInfoLines->{domain_type} eq "main" ) {
+                $maindocroot = $DomainInfoLines->{docroot};
+                last;
+            }
+        }
+    }
+    if ( !defined $maindocroot ) {
+        print_warn("[WARN] * No Document root found\n");
+        return;
+    }
+    return $maindocroot;
+}
+
+sub email_valiases {
+    my $tcEmail = shift;
+    my ( $localpart, $domain ) = $tcEmail =~ /(.*)@(.*)/;
+    my $DataJSON = get_whmapi1( 'getdomainowner', "domain=$domain" );
+    my $cpUser   = $DataJSON->{data}->{user};
+    my $dir      = "/etc/valiases/$domain";
+    return unless ( -s $dir );
+    open FILE, $dir;
+    while ( my $lines = <FILE> ) {
+        if ( $lines =~ /^$email/ ) {
+            if ( $lines =~ /\.\bautorespond/ ) {
+                print_warn("[WARN] * Autoresponder found in $dir\n");
+                print_info("\t\t\\_$lines");
+            }
+            else {
+                print_warn("[WARN] * Forwarder found in $dir\n");
+                print_info("\t\t\\_$lines");
+            }
+        }
+    }
+}
+
+sub is_exim_running {
+    my $exim_port = qx/lsof -n -P -i :25/;
+
+    if ( $exim_port =~ m/exim.+LISTEN*/ ) {
+        print_info("Exim is running on port 25\n");
+    }
+    else {
+        print_warn("[WARN] * Exim is not running on port 25\n");
+    }
+}
+
+sub get_json_from_command {
+    my @cmd = @_;
+    return Cpanel::JSON::Load( Cpanel::SafeRun::Timed::timedsaferun( 30, @cmd ) );
+}
+
+sub get_whmapi1 {
+    return get_json_from_command( 'whmapi1', '--output=json', @_ );
+}
+
+sub get_uapi {
+    return get_json_from_command( 'uapi', '--output=json', @_ );
+}
+
+sub do_email {
+    my $tcEmail = shift;
+    my ( $localpart, $tcdomain ) = $tcEmail =~ /(.*)@(.*)/;
+    my $DataJSON     = get_whmapi1( 'getdomainowner', "domain=$tcdomain" );
+    my $cpUser       = $DataJSON->{data}->{user};
+    my $ListPopsJSON = get_uapi( 'Email', 'list_pops_with_disk', "--user=$cpUser", "domain=$tcdomain" );
+    my $found        = 0;
+    my $ShowHeader   = 0;
+    for my $EmailPop ( @{ $ListPopsJSON->{result}->{data} } ) {
+        if ( $EmailPop->{email} eq $tcEmail ) {
+            $found = 1;
+        }
+    }
+    print_warn("[WARN] * $tcEmail doesn't seem to exist on this server.\n ") unless ($found);
+    return                                                                   unless ($found);
+    my @listPops;
+    for my $EmailPop ( @{ $ListPopsJSON->{result}->{data} } ) {
+        my $emailacctline = $EmailPop->{email};
+        next unless ( $emailacctline eq $tcEmail );
+        my $qused    = ( $EmailPop->{humandiskused} eq 'None' )  ? $EmailPop->{diskused} : $EmailPop->{humandiskused};
+        my $qlimit   = ( $EmailPop->{humandiskquota} eq 'None' ) ? "Unlimited"           : $EmailPop->{humandiskquota};
+        my $qpercent = $EmailPop->{diskusedpercent20};
+        $localpart = $EmailPop->{user};
+        print_info("$emailacctline - Quota: $qused used of $qlimit [ $qpercent % ]\n");
+        print_warn( RED "\t\\_ OVER QUOTA\n" ) unless ( $qpercent < 100 );
+    }
+    my $UserFilterJSON = get_uapi( 'Email', 'list_filters', "--user=$cpUser", "account=$localpart%40$tcdomain" );
+    $ShowHeader = 0;
+    for my $UserFilter ( @{ $UserFilterJSON->{result}->{data} } ) {
+        print YELLOW "\t \\_ has the following user level filters\n" unless ($ShowHeader);
+        $ShowHeader = 1;
+        print WHITE "\t\t \\_ $UserFilter->{filtername}\n";
+    }
+    $ShowHeader = 0;
+    my $UserForwarderJSON = get_uapi( 'Email', 'list_forwarders', "--user=$cpUser", "account=$tcdomain" );
+    for my $UserForwarder ( @{ $UserForwarderJSON->{result}->{data} } ) {
+        if ( $UserForwarder->{dest} eq $tcEmail ) {
+            print YELLOW "\t \\_ has the following user level filters\n" unless ($ShowHeader);
+            $ShowHeader = 1;
+            print WHITE "\t\\_ $UserForwarder->{dest} => $UserForwarder->{forward}\n";
+        }
+    }
+}
+
+sub check_closed_ports {
+    my $command = qx/iptables -nL | grep DROP/;
+    my @rules   = split /\n/, $command;
+    my @list    = grep( /.*(:25\s|:26\s|:465\s|:587\s).*/, @rules );
+    if ( !@list ) {
+        print_info("All mail ports appear to be open\n");
+    }
+    else {
+        print_info("[INFO] * Blocked ports:\n");
+        foreach (@list) {
+            print_warn( "\t\\_ " . $_ . "\n" );
+        }
+    }
+}
+
+sub mx_consistency {
+    my $tcValue = shift;
+    my $isEmail = 0;
+    my $localpart;
+    my $tcdomain;
+    if ( $tcValue =~ /\@/ ) {
+        ( $localpart, $tcdomain ) = $tcValue =~ /(.*)@(.*)/;
+        $isEmail = 1;
+    }
+    if ($isEmail) {
+        $tcValue = $tcdomain;
+    }
+    my $main_ip = qx/hostname -i/;
+    chomp($main_ip);
+    my @mxcheck_local  = qx/dig mx \@$main_ip $tcValue +short/;
+    my @mxcheck_remote = qx/dig mx \@1.1.1.1 $tcValue +short/;
+    if ( @mxcheck_local eq @mxcheck_remote ) {
+        print_info("Remote and local MX lookups match\n");
+        foreach (@mxcheck_local) {
+            print_info("\t\\_ Local MX: $tcValue IN MX $_");
+        }
+        print "\n";
+        foreach (@mxcheck_remote) {
+            print_info("\t\\_ Remote MX: $tcValue IN MX $_");
+        }
+    }
+    else {
+        print_warn("Local MX does not match remote MX\n ");
+        foreach (@mxcheck_local) {
+            chomp($_);
+            print "\t\\_ Local MX: $tcValue IN MX $_";
+        }
+        print "\n";
+        foreach (@mxcheck_remote) {
+            chomp($_);
+            print "\t\\_ Remote MX: $tcValue IN MX $_\n";
+        }
+    }
+}
+
