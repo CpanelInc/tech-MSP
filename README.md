@@ -1,4 +1,4 @@
-# MSP - Mail Status Probe
+# MSP - Mail Status Probe - By W. Little
 ## MSP is currently a commandline function that provides basic information about the cPanel mail server.
 ###### This project was formmaly known under SSE; however, SSE is now confused with Server-Sent Events. As the project has been rewritten from scratch, the name SSE has been repurposed, and to avoid breakage(sse.pl is still included but not maintained), the name MSP has been taken.
 -------------
