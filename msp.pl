@@ -18,7 +18,7 @@ use POSIX;
 use File::Find;
 
 # Variables
-our $VERSION = '2.2';
+our $VERSION = '2.3';
 
 our $LOGDIR              = q{/var/log/};
 our $CPANEL_CONFIG_FILE  = q{/var/cpanel/cpanel.config};
@@ -1309,6 +1309,8 @@ sub do_email {
     my ( $localpart, $tcdomain ) = $tcEmail =~ /(.*)@(.*)/;
     my $DataJSON     = get_whmapi1( 'getdomainowner', "domain=$tcdomain" );
     my $cpUser       = $DataJSON->{data}->{user};
+    print "Invalid email address for $tcdomain (has no user)\n" unless( $DataJSON->{data}->{user} );
+    exit unless( $DataJSON->{data}->{user} );
     my $ListPopsJSON = get_uapi( 'Email', 'list_pops_with_disk', "--user=$cpUser", "domain=$tcdomain" );
     my $found        = 0;
     my $ShowHeader   = 0;
