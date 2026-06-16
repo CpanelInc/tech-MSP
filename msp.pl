@@ -15,10 +15,11 @@ use Cpanel::IO                 ();
 use Term::ANSIColor qw{:constants};
 $Term::ANSIColor::AUTORESET = 1;
 use POSIX;
+use IPC::System::Simple qw(capturex);
 use File::Find;
 
 # Variables
-our $VERSION = '2.3';
+our $VERSION = '2.2';
 
 our $LOGDIR              = q{/var/log/};
 our $CPANEL_CONFIG_FILE  = q{/var/cpanel/cpanel.config};
@@ -869,12 +870,12 @@ sub check_local_or_remote {
 }
 
 sub mx_check {
-    my @mx_record = qx/dig mx $domain +short/;
+    my @mx_record = capturex('dig', 'mx', $domain, '+short');
     chomp(@mx_record);
     my @dig_mx_ip;
 
     foreach my $mx_record (@mx_record) {
-        my $dig_mx_ip = qx/dig $mx_record +short/;
+        my $dig_mx_ip = capturex('dig', $mx_record, '+short');
         push( @dig_mx_ip, $dig_mx_ip );
         chomp(@dig_mx_ip);
 
@@ -884,7 +885,7 @@ sub mx_check {
         print_info("\t \\_ MX Record: $mx_record\n");
     }
     foreach (@mx_record) {
-        print_info( "\t\t \\_ " . qx/dig $_ +short/ );
+        print_info( "\t\t \\_ " . capturex('dig', $_, '+short') );
 
     }
 }
@@ -979,7 +980,7 @@ sub domain_resolv {
         }
 
         sub check_spf {
-            my @check = qx/dig $domain TXT/;
+            my @check = capturex('dig', $domain, 'TXT');
             if ( grep ( m/.*spf.*/, @check ) ) {
                 print_info("$domain has the folloiwng SPF records:\n");
                 foreach my $check (@check) {
@@ -994,7 +995,7 @@ sub domain_resolv {
         }
 
         sub check_dkim {
-            my @check_dkim = qx/dig default._domainkey.$domain TXT +short/;
+            my @check_dkim = capturex('dig', "default._domainkey.$domain", 'TXT', '+short');
             if (@check_dkim) {
                 foreach my $check_dkim (@check_dkim) {
                     print_info("$domain has the following domain keys:\n ");
@@ -1309,8 +1310,6 @@ sub do_email {
     my ( $localpart, $tcdomain ) = $tcEmail =~ /(.*)@(.*)/;
     my $DataJSON     = get_whmapi1( 'getdomainowner', "domain=$tcdomain" );
     my $cpUser       = $DataJSON->{data}->{user};
-    print "Invalid email address for $tcdomain (has no user)\n" unless( $DataJSON->{data}->{user} );
-    exit unless( $DataJSON->{data}->{user} );
     my $ListPopsJSON = get_uapi( 'Email', 'list_pops_with_disk', "--user=$cpUser", "domain=$tcdomain" );
     my $found        = 0;
     my $ShowHeader   = 0;
@@ -1379,8 +1378,8 @@ sub mx_consistency {
     }
     my $main_ip = qx/hostname -i/;
     chomp($main_ip);
-    my @mxcheck_local  = qx/dig mx \@$main_ip $tcValue +short/;
-    my @mxcheck_remote = qx/dig mx \@1.1.1.1 $tcValue +short/;
+    my @mxcheck_local  = capturex('dig', 'mx', '@' . $main_ip, $tcValue, '+short');
+    my @mxcheck_remote = capturex('dig', 'mx', '@1.1.1.1', $tcValue, '+short');
     if ( @mxcheck_local eq @mxcheck_remote ) {
         print_info("Remote and local MX lookups match\n");
         foreach (@mxcheck_local) {
