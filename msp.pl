@@ -201,11 +201,8 @@ sub conf_check {
     if ( $dovecot->{'protocols'} !~ m/imap/ ) {
         print_warn("IMAP Protocol is disabled!\n");
     }
-    if ( $dovecot->{'disable_plaintext_auth'} !~ m/no/ ) {
-        print_warn("Allow Plaintext Authentication is enabled!\n");
-    }
-    elsif ( $opts{verbose} ) {
-        print_info("Allow Plaintext Authentication is disabled\n");
+    if ( $dovecot->{'auth_allow_cleartext'} !~ m/no/ ) {
+        print_warn("Allow Cleartext Authentication is enabled!\n");
     }
     print "\n";
     return;
