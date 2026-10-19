@@ -19,7 +19,7 @@ use IPC::System::Simple qw(capturex);
 use File::Find;
 
 # Variables
-our $VERSION = '2.2';
+our $VERSION = '2.5';
 
 our $LOGDIR              = q{/var/log/};
 our $CPANEL_CONFIG_FILE  = q{/var/cpanel/cpanel.config};
@@ -438,7 +438,7 @@ sub maillog_check {
     }
 
     # Collect log files
-    for my $file ( grep { m/^maillog/ } @{ Cpanel::FileUtils::Dir::get_directory_nodes($logdir) } ) {
+    for my $file ( grep { m/^maillog|mail\.log/ } @{ Cpanel::FileUtils::Dir::get_directory_nodes($logdir) } ) {
         if ( $opts{rotated} ) {
             if ( ( $file =~ m/maillog-/ ) && ( $logcount ne $ROTATED_LIMIT ) ) {
                 push @logfiles, $file;
@@ -446,6 +446,7 @@ sub maillog_check {
             }
         }
         push @logfiles, $file if ( $file =~ m/maillog$/ );
+        push @logfiles, $file if ( $file =~ m/mail.log$/ );
     }
     print_warn("Safeguard triggered... --rotated is limited to $ROTATED_LIMIT logs\n") if ( $logcount eq $ROTATED_LIMIT );
 
