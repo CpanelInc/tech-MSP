@@ -5,14 +5,14 @@ use strict;
 use warnings;
 use Cpanel::SafeRun::Timed ();
 use Cpanel::JSON           ();
-use JSON::MaybeXS qw(encode_json decode_json);
+use JSON::MaybeXS          qw(encode_json decode_json);
 use Sys::Hostname;
 use Getopt::Long;
 use Cpanel::AdvConfig::dovecot ();
 use Cpanel::FileUtils::Dir     ();
 use Cpanel::IONice             ();
 use Cpanel::IO                 ();
-use Term::ANSIColor qw{:constants};
+use Term::ANSIColor            qw{:constants};
 $Term::ANSIColor::AUTORESET = 1;
 use POSIX;
 use IPC::System::Simple qw(capturex);
@@ -70,7 +70,7 @@ GetOptions(
     'threshold=i{1}',
     'verbose',
     'domain=s' => \$domain,
-    'email:s'  => \$email,,
+    'email:s'  => \$email,
 ) or die("Please see --help\n");
 
 # Make this a modulino
@@ -708,9 +708,9 @@ sub _timedsaferun {    # Borrowed from WHM 66 Cpanel::SafeRun::Timed and modifie
     };
     alarm 0;
     if ( !$complete && $pid && $pid > 0 ) {
-        kill( 15, $pid );                            #TERM
-        sleep(2);                                    # Give the process a chance to die 'nicely'
-        kill( 9, $pid );                             #KILL
+        kill( 15, $pid );    #TERM
+        sleep(2);            # Give the process a chance to die 'nicely'
+        kill( 9, $pid );     #KILL
     }
     return defined $output ? $output : '';
 }
@@ -868,12 +868,12 @@ sub check_local_or_remote {
 }
 
 sub mx_check {
-    my @mx_record = capturex('dig', 'mx', $domain, '+short');
+    my @mx_record = capturex( 'dig', 'mx', $domain, '+short' );
     chomp(@mx_record);
     my @dig_mx_ip;
 
     foreach my $mx_record (@mx_record) {
-        my $dig_mx_ip = capturex('dig', $mx_record, '+short');
+        my $dig_mx_ip = capturex( 'dig', $mx_record, '+short' );
         push( @dig_mx_ip, $dig_mx_ip );
         chomp(@dig_mx_ip);
 
@@ -883,7 +883,7 @@ sub mx_check {
         print_info("\t \\_ MX Record: $mx_record\n");
     }
     foreach (@mx_record) {
-        print_info( "\t\t \\_ " . capturex('dig', $_, '+short') );
+        print_info( "\t\t \\_ " . capturex( 'dig', $_, '+short' ) );
 
     }
 }
@@ -978,7 +978,7 @@ sub domain_resolv {
         }
 
         sub check_spf {
-            my @check = capturex('dig', $domain, 'TXT');
+            my @check = capturex( 'dig', $domain, 'TXT' );
             if ( grep ( m/.*spf.*/, @check ) ) {
                 print_info("$domain has the folloiwng SPF records:\n");
                 foreach my $check (@check) {
@@ -993,7 +993,7 @@ sub domain_resolv {
         }
 
         sub check_dkim {
-            my @check_dkim = capturex('dig', "default._domainkey.$domain", 'TXT', '+short');
+            my @check_dkim = capturex( 'dig', "default._domainkey.$domain", 'TXT', '+short' );
             if (@check_dkim) {
                 foreach my $check_dkim (@check_dkim) {
                     print_info("$domain has the following domain keys:\n ");
@@ -1376,8 +1376,8 @@ sub mx_consistency {
     }
     my $main_ip = qx/hostname -i/;
     chomp($main_ip);
-    my @mxcheck_local  = capturex('dig', 'mx', '@' . $main_ip, $tcValue, '+short');
-    my @mxcheck_remote = capturex('dig', 'mx', '@1.1.1.1', $tcValue, '+short');
+    my @mxcheck_local  = capturex( 'dig', 'mx', '@' . $main_ip, $tcValue, '+short' );
+    my @mxcheck_remote = capturex( 'dig', 'mx', '@1.1.1.1',     $tcValue, '+short' );
     if ( @mxcheck_local eq @mxcheck_remote ) {
         print_info("Remote and local MX lookups match\n");
         foreach (@mxcheck_local) {
